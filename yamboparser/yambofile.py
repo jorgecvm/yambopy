@@ -183,7 +183,7 @@ class YamboFile():
                 kindx, kpt, wgt = kpoints.match(line).groups()
                 self.kpoints[str(int(kindx))] =  [ float(i.strip()) for i in kpt.split()]
                     
-        full_lines = '\n'.join(self.lines)
+        full_lines = ''.join(self.lines)
         qp_regx = re.compile('(^\s+?QP\s\[eV\]\s@\sK\s\[\d+\][a-z0-9E:()\s.-]+)(.*?)(?=^$)',re.M|re.DOTALL)
         kp_regex = re.compile('^\s+?QP\s\[eV\]\s@\sK\s\[(\d+)\][a-z0-9E:()\s.-]+$')
         spliter = re.compile('^(B[=]\d+\sEo[=]\s+?[E0-9.-]+\sE[=]\s+?[E0-9.-]+\sE[-]Eo[=]\s+?[E0-9.-]+\sRe[(]Z[)][=]\s+?[E0-9.-]+\sIm[(]Z[)][=]\s?[E0-9.-]+\snlXC[=]\s+?[E0-9.-]+\slXC[=]\s+?[E0-9.-]+\sSo[=]\s+?[E0-9.-]+)')
