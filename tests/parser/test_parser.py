@@ -66,6 +66,18 @@ class TestFileT2(unittest.TestCase):
         print "fl type", fl.type
         assert fl.type=='netcdf_hf'
 
+class TestFileT4(unittest.TestCase):
+
+    def test_missing_indicator(self):
+        fl = YamboFile('r-GW_run.8.480_em1d_ppa_HF_and_locXC_gw0_rim_cut',folder+'t4_parse_success')
+        assert  fl.game_over == False
+
+    def test_present_indicator(self):
+        fl = YamboFile('r-GW_run.16.2000_em1d_ppa_HF_and_locXC_gw0_rim_cut',folder+'t4_parse_success')
+        assert  fl.game_over == True
+
+
+
 if __name__ == "__main__":
     
     #t1_errors_warnings
