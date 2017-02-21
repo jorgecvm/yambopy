@@ -45,6 +45,7 @@ class YamboFile():
         self.data     = {} #dictionary containing all the important data from the file
         self.kpoints = {}
         self.timing = []
+        self.game_over = False  # check yambo run completed successfully
  
         if any(filename.startswith(prefix) for prefix in self._output_prefixes):
             #read lines from file
@@ -170,6 +171,7 @@ class YamboFile():
         kpoints = re.compile('^  [A-X*]+\sK\s\[([0-9]+)\]\s[:](?:\s+)?([0-9.E-]+\s+[0-9.E-]+\s+[0-9.E-]+)\s[A-Za-z()\s*.]+[0-9]+[A-Za-z()\s*.]+([0-9.]+)')
         memory = re.compile('^\s+?<([0-9a-z-]+)> ([A-Z0-9]+)[:] \[M  ([0-9.]+) Gb\]? ([a-zA-Z0-9\s.()\[\]]+)?')
         timing = re.compile('\s+?[A-Za-z]+iming\s+?[A-Za-z/\[\]]+[:]\s+?([a-z0-9-]+)[/]([a-z0-9-]+)[/]([a-z0-9-]+)')
+        game_over = re.compile('^\s+?\[\d+\]\s+?G\w+\s+?O\w+\s+?\&\s+?G\w+\s+?\w+') # Game over & Game summary
         self.memstats.extend([ line for line in self.lines if memory.match(line)])
         for line in self.lines:
             if err.match(line):
@@ -182,6 +184,8 @@ class YamboFile():
             if kpoints.match(line):
                 kindx, kpt, wgt = kpoints.match(line).groups()
                 self.kpoints[str(int(kindx))] =  [ float(i.strip()) for i in kpt.split()]
+            if game_over.match(line):
+                self.game_over = True
                     
         full_lines = ''.join(self.lines)
         qp_regx = re.compile('(^\s+?QP\s\[eV\]\s@\sK\s\[\d+\][a-z0-9E:()\s.-]+)(.*?)(?=^$)',re.M|re.DOTALL)
