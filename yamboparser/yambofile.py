@@ -252,6 +252,10 @@ class YamboFile():
         error = re.compile('^\s+?<([0-9a-z-]+)> ([A-Z0-9]+)[:] \[(ERROR)\]? ([a-zA-Z0-9\s.()\[\]]+)?')
         self.warnings.extend([ line for line in self.lines if warning.match(line)])
         self.errors.extend([ line for line in self.lines if error.match(line)])
+        p2y_complete = re.compile('^(\s+)?[-<>\d\w]+\s+?P\d+[:]\s+?==\s+?P2Y\s+?\w+\s+?==(\s+)?') # P2Y Complete
+        for line in self.lines:
+            if p2y_complete.match(line):
+                self.p2y_complete = True
         
 
     def __bool__(self):
