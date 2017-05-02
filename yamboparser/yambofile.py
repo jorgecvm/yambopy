@@ -31,7 +31,7 @@ class YamboFile():
     """
     _output_prefixes = ['o-']
     _report_prefixes = ['r-','r.']
-    _log_prefixes    = ['l-','l.']
+    _log_prefixes    = ['l-','l.','l_']
     _netcdf_prefixes = ['ns','ndb']
     _netcdf_sufixes  = {'QP':'gw','HF_and_locXC':'hf'}
 
