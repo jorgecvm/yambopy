@@ -37,6 +37,8 @@ print fl.kpoints
 print fl.data
 
 
+fl = YamboFile('l_stderr',folder)
+print "type ", fl.type
 
 
 folder = os.path.dirname(os.path.realpath(__file__))+'/testdata/t2_parse_qps'
@@ -59,3 +61,5 @@ print
 print "type", fl.type
 print "kpts", fl.kpoints
 print "data", fl.data
+
+
