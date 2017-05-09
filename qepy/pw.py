@@ -4,12 +4,53 @@
 # This file is part of yambopy
 #
 #
+from qepy import *
 import os
 import re
 from math import sqrt
 
 class PwIn():
-    """ A class to generate an manipulate quantum espresso input files
+    """
+    Class to generate an manipulate Quantum Espresso input files
+    Can be initialized either reading from a file or starting from a new file.
+
+    Examples of use:
+
+    To read a local file with name "mos2.in"
+
+        .. code-block :: python
+        
+            qe = PwIn('mos2.scf')
+            print qe
+
+    To start a file from scratch
+
+        .. code-block :: python
+        
+            qe = PwIn('mos2.scf')
+            qe.atoms = [['N',[ 0.0, 0.0,0.0]],
+                        ['B',[1./3,2./3,0.0]]]
+            qe.atypes = {'B': [10.811, "B.pbe-mt_fhi.UPF"],
+                         'N': [14.0067,"N.pbe-mt_fhi.UPF"]}
+
+            qe.control['prefix'] = "'%s'"%prefix
+            qe.control['verbosity'] = "'high'"
+            qe.control['wf_collect'] = '.true.'
+            qe.control['pseudo_dir'] = "'../pseudos/'"
+            qe.system['celldm(1)'] = 4.7
+            qe.system['celldm(3)'] = layer_separation/qe.system['celldm(1)']
+            qe.system['ecutwfc'] = 60
+            qe.system['occupations'] = "'fixed'"
+            qe.system['nat'] = 2
+            qe.system['ntyp'] = 2
+            qe.system['ibrav'] = 4
+            qe.kpoints = [6, 6, 1]
+            qe.electrons['conv_thr'] = 1e-8
+
+            print qe
+     
+    Special care should be taken with string variables e.g. "'high'"
+ 
     """    
     _pw = 'pw.x'
 
@@ -59,6 +100,24 @@ class PwIn():
                     atype, mass, psp = lines.next().split()
                     self.atypes[atype] = [mass,psp]
 
+    def get_symmetry_spglib(self):
+        """
+        get the symmetry group of this system using spglib
+        """
+        import spglib
+
+        lat, positions, atypes = self.get_atoms()
+        lat = np.array(lat)
+
+        at = np.unique(atypes)
+        an = dict(zip(at,xrange(len(at))))
+        atypes = [an[a] for a in atypes]
+
+        cell = (lat,positions,atypes)
+
+        spacegroup = spglib.get_spacegroup(cell,symprec=1e-5)
+        return spacegroup
+
     def get_masses(self):
         """ Get an array with the masses of all the atoms
         """
@@ -77,9 +136,22 @@ class PwIn():
         """
         self.read_cell_parameters()
         cell = self.cell_parameters
-        pos = [atom[1] for atom in self.atoms]
         sym = [atom[0] for atom in self.atoms]
+        pos = [atom[1] for atom in self.atoms]
+        if self.atomic_pos_type == 'bohr':
+            pos = car_red(pos,cell)
         return cell, pos, sym
+
+    def set_atoms_string(self,string):
+        """
+        set the atomic postions using string of the form
+        Si 0.0 0.0 0.0
+        Si 0.5 0.5 0.5
+        """
+        atoms_str = [line.strip().split() for line in string.strip().split('\n')]
+        self.atoms = []
+        for atype,x,y,z in atoms_str:
+            self.atoms.append([atype,map(float,[x,y,z])])
 
     def set_atoms(self,atoms):
         """ set the atomic postions using a Atoms datastructure from ase
@@ -94,10 +166,11 @@ class PwIn():
     def displace(self,mode,displacement,masses=None):
         """ A routine to displace the atoms acoording to a phonon mode
         """
-        small_mass = min(masses) #we scale all the displacements to the bigger mass
         if masses is None:
             masses = [1] * len(self.atoms)
             small_mass = 1
+        else:
+            small_mass = min(masses) #we scale all the displacements to the bigger mass
         for i in xrange(len(self.atoms)):
             self.atoms[i][1] = self.atoms[i][1] + mode[i].real*displacement*sqrt(small_mass)/sqrt(masses[i])
 
@@ -106,10 +179,12 @@ class PwIn():
         #find READ_ATOMS keyword in file and read next lines
         for line in lines:
             if "ATOMIC_POSITIONS" in line:
+                atomic_pos_type = line
                 self.atomic_pos_type = re.findall('([A-Za-z]+)',line)[-1]
                 for i in xrange(int(self.system["nat"])):
                     atype, x,y,z = lines.next().split()
                     self.atoms.append([atype,[float(i) for i in x,y,z]])
+        self.atomic_pos_type = atomic_pos_type.replace('{','').replace('}','').strip().split()[1]
 
     def read_cell_parameters(self):
         ibrav = int(self.system['ibrav'])

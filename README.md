@@ -1,7 +1,11 @@
 yambopy
 =======
 
-Create automatic workflows for yambo using python
+Create automatic workflows for yambo using python.
+
+Yambo official website: http://www.yambo-code.org/ 
+
+Yambo Github page: https://github.com/yambo-code/yambo
 
 Documentation
 -------------
@@ -28,7 +32,7 @@ Requirements
 - yambo (>4.0.0): http://www.yambo-code.org/
 - numpy: http://www.numpy.org/
 - matplotlib: http://matplotlib.org/
-- netCDF4 (optional): http://unidata.github.io/netcdf4-python/
+- netCDF4: http://unidata.github.io/netcdf4-python/
 - Quantum Espresso (optional): http://www.quantum-espresso.org/
 
 TODO
@@ -39,5 +43,7 @@ Authors
 ------
 - [Henrique Pereira Coutada Miranda](http://henriquemiranda.github.io/)
 - [Alejandro Molina Sanchez](http://alexmoratalla.github.io/)
+- Fulvio Paleari
+- Alexandre Morlet
 
 The code is at an early stage of development, help us by sending bug reports, patches and suggestions!

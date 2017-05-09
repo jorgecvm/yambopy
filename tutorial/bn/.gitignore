@@ -4,6 +4,7 @@ nscf
 database
 nscf_double
 database_double
+bands
 phonon
 gw
 gw_conv
@@ -18,3 +19,7 @@ bse_cutoff
 gw_bse
 jobs.sh
 bse.json
+gw-xi
+gw-zeros
+analyse_gw_conv
+pl

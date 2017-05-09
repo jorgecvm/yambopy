@@ -2,7 +2,13 @@ bse
 bse_conv
 database
 gw
+bands
 gw_conv
 nscf
 relax
 scf
+bse_cutoff
+bse_par
+*.json
+jobs.sh
+proj.in
