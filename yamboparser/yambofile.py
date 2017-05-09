@@ -31,7 +31,7 @@ class YamboFile():
     """
     _output_prefixes = ['o-']
     _report_prefixes = ['r-','r.']
-    _log_prefixes    = ['l-','l.']
+    _log_prefixes    = ['l-','l.','l_']
     _netcdf_prefixes = ['ns','ndb']
     _netcdf_sufixes  = {'QP':'gw','HF_and_locXC':'hf'}
 
@@ -45,6 +45,8 @@ class YamboFile():
         self.data     = {} #dictionary containing all the important data from the file
         self.kpoints = {}
         self.timing = []
+        self.game_over = False  # check yambo run completed successfully
+        self.p2y_complete = False  # check yambo initialization completed successfully
  
         if any(filename.startswith(prefix) for prefix in self._output_prefixes):
             #read lines from file
@@ -170,6 +172,8 @@ class YamboFile():
         kpoints = re.compile('^  [A-X*]+\sK\s\[([0-9]+)\]\s[:](?:\s+)?([0-9.E-]+\s+[0-9.E-]+\s+[0-9.E-]+)\s[A-Za-z()\s*.]+[0-9]+[A-Za-z()\s*.]+([0-9.]+)')
         memory = re.compile('^\s+?<([0-9a-z-]+)> ([A-Z0-9]+)[:] \[M  ([0-9.]+) Gb\]? ([a-zA-Z0-9\s.()\[\]]+)?')
         timing = re.compile('\s+?[A-Za-z]+iming\s+?[A-Za-z/\[\]]+[:]\s+?([a-z0-9-]+)[/]([a-z0-9-]+)[/]([a-z0-9-]+)')
+        game_over = re.compile('^\s+?\[\d+\]\s+?G\w+\s+?O\w+\s+?\&\s+?G\w+\s+?\w+') # Game over & Game summary
+        p2y_complete = re.compile('^(\s+)?[-<>\d\w]+\s+?P\d+[:]\s+?==\s+?P2Y\s+?\w+\s+?==(\s+)?') # P2Y Complete
         self.memstats.extend([ line for line in self.lines if memory.match(line)])
         for line in self.lines:
             if err.match(line):
@@ -182,8 +186,12 @@ class YamboFile():
             if kpoints.match(line):
                 kindx, kpt, wgt = kpoints.match(line).groups()
                 self.kpoints[str(int(kindx))] =  [ float(i.strip()) for i in kpt.split()]
+            if game_over.match(line):
+                self.game_over = True
+            if p2y_complete.match(line):
+                self.p2y_complete = True
                     
-        full_lines = '\n'.join(self.lines)
+        full_lines = ''.join(self.lines)
         qp_regx = re.compile('(^\s+?QP\s\[eV\]\s@\sK\s\[\d+\][a-z0-9E:()\s.-]+)(.*?)(?=^$)',re.M|re.DOTALL)
         kp_regex = re.compile('^\s+?QP\s\[eV\]\s@\sK\s\[(\d+)\][a-z0-9E:()\s.-]+$')
         spliter = re.compile('^(B[=]\d+\sEo[=]\s+?[E0-9.-]+\sE[=]\s+?[E0-9.-]+\sE[-]Eo[=]\s+?[E0-9.-]+\sRe[(]Z[)][=]\s+?[E0-9.-]+\sIm[(]Z[)][=]\s?[E0-9.-]+\snlXC[=]\s+?[E0-9.-]+\slXC[=]\s+?[E0-9.-]+\sSo[=]\s+?[E0-9.-]+)')
@@ -244,6 +252,10 @@ class YamboFile():
         error = re.compile('^\s+?<([0-9a-z-]+)> ([A-Z0-9]+)[:] \[(ERROR)\]? ([a-zA-Z0-9\s.()\[\]]+)?')
         self.warnings.extend([ line for line in self.lines if warning.match(line)])
         self.errors.extend([ line for line in self.lines if error.match(line)])
+        p2y_complete = re.compile('^(\s+)?[-<>\d\w]+\s+?P\d+[:]\s+?==\s+?P2Y\s+?\w+\s+?==(\s+)?') # P2Y Complete
+        for line in self.lines:
+            if p2y_complete.match(line):
+                self.p2y_complete = True
         
 
     def __bool__(self):
