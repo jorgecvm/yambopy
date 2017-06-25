@@ -31,7 +31,8 @@ class YamboFile():
     """
     _output_prefixes = ['o-']
     _report_prefixes = ['r-','r.']
-    _log_prefixes    = ['l-','l.','l_']
+    _log_prefixes    = ['l-','l.']
+    _p2y_log_prefixes = ['l_']
     _netcdf_prefixes = ['ns','ndb']
     _netcdf_sufixes  = {'QP':'gw','HF_and_locXC':'hf'}
 
@@ -42,9 +43,16 @@ class YamboFile():
         self.errors   = [] #list of errors
         self.warnings   = [] #list of warnings
         self.memstats   = [] #list of memory allocation statistics
+        self.max_memory = None # max memory allocated or freed (Gb)
+        self.last_memory = None # last memory allocated or freed (Gb)
+        self.last_memory_time = None # last memory allocated or freed (Gb)
+        self.timestats   = [] #list of reported times 
+        self.last_time = None # last reported time 
+        self.yambo_wrote = None #  yambo performed a write to disk
         self.data     = {} #dictionary containing all the important data from the file
         self.kpoints = {}
         self.timing = []
+        self.wall_time = None
         self.game_over = False  # check yambo run completed successfully
         self.p2y_complete = False  # check yambo initialization completed successfully
  
@@ -67,6 +75,8 @@ class YamboFile():
             self.type = 'report'
         elif any(filename.startswith(prefix) for prefix in self._log_prefixes):
             self.type = 'log'
+        elif any(filename.startswith(prefix) for prefix in self._p2y_log_prefixes):
+            self.type = 'p2y_log'
         elif any(filename.startswith(prefix) for prefix in self._netcdf_prefixes) and _has_netcdf:
             for sufix in self._netcdf_sufixes:
                 if filename.endswith(sufix): 
@@ -86,6 +96,7 @@ class YamboFile():
         elif self.type == 'netcdf_hf': self.parse_netcdf_hf()
         elif self.type == 'output_gw': self.parse_output()
         elif self.type == 'log': self.parse_log()
+        elif self.type == 'p2y_log': self.parse_p2y_log()
         elif self.type == 'report'  : self.parse_report()
 
     def parse_output(self):
@@ -183,11 +194,11 @@ class YamboFile():
         # start with check for  failure due to error:
         err = re.compile('^\s+?\[ERROR\]\s+?(.*)$')
         kpoints = re.compile('^  [A-X*]+\sK\s\[([0-9]+)\]\s[:](?:\s+)?([0-9.E-]+\s+[0-9.E-]+\s+[0-9.E-]+)\s[A-Za-z()\s*.]+[0-9]+[A-Za-z()\s*.]+([0-9.]+)')
-        memory = re.compile('^\s+?<([0-9a-z-]+)> ([A-Z0-9]+)[:] \[M  ([0-9.]+) Gb\]? ([a-zA-Z0-9\s.()\[\]]+)?')
         timing = re.compile('\s+?[A-Za-z]+iming\s+?[A-Za-z/\[\]]+[:]\s+?([a-z0-9-]+)[/]([a-z0-9-]+)[/]([a-z0-9-]+)')
         game_over = re.compile('^\s+?\[\d+\]\s+?G\w+\s+?O\w+\s+?\&\s+?G\w+\s+?\w+') # Game over & Game summary
         p2y_complete = re.compile('^(\s+)?[-<>\d\w]+\s+?P\d+[:]\s+?==\s+?P2Y\s+?\w+\s+?==(\s+)?') # P2Y Complete
-        self.memstats.extend([ line for line in self.lines if memory.match(line)])
+        p2y_complete_v2 = re.compile('(\s+)?[-<>\w\d]+(\s+)?==(\s+)?P2Y(\s+)?\w+(\s+)?==') # P2Y Complete
+        yambo_wrote =  re.compile('(?:\s+)?[[]WR[./\w]+[]](?:[-])+')
         for line in self.lines:
             if err.match(line):
                 if 'STOP' in err.match(line).groups()[0]:
@@ -201,9 +212,12 @@ class YamboFile():
                 self.kpoints[str(int(kindx))] =  [ float(i.strip()) for i in kpt.split()]
             if game_over.match(line):
                 self.game_over = True
-            if p2y_complete.match(line):
+            if p2y_complete.match(line) or p2y_complete_v2.match(line):
                 self.p2y_complete = True
-                    
+                self.game_over = True
+            if yambo_wrote.match(line):
+                self.yambo_wrote = True
+    
         full_lines = ''.join(self.lines)
         qp_regx = re.compile('(^\s+?QP\s\[eV\]\s@\sK\s\[\d+\][a-z0-9E:()\s.-]+)(.*?)(?=^$)',re.M|re.DOTALL)
         kp_regex = re.compile('^\s+?QP\s\[eV\]\s@\sK\s\[(\d+)\][a-z0-9E:()\s.-]+$')
@@ -265,11 +279,44 @@ class YamboFile():
         error = re.compile('^\s+?<([0-9a-z-]+)> ([A-Z0-9]+)[:] \[(ERROR)\]? ([a-zA-Z0-9\s.()\[\]]+)?')
         self.warnings.extend([ line for line in self.lines if warning.match(line)])
         self.errors.extend([ line for line in self.lines if error.match(line)])
+        memory = re.compile('^\s+?<([0-9a-z-]+)> ([A-Z0-9]+)[:] \[M  ([0-9.]+) Gb\]? ([a-zA-Z0-9\s.()\[\]]+)?')
+        self.memstats.extend([ line for line in self.lines if memory.match(line)])
+        self.max_memory = max([float(memory.match(line).groups()[2]) for line in self.memstats])
+        self.last_memory = [float(memory.match(line).groups()[2]) for line in self.memstats][-1]
+        # Function to convert time in seconds
+        def get_seconds(time_string):
+            time = time_string.split('-')
+            if time[0].endswith('h'):
+                return int(time[0].replace("h","")) * 3600 + int(time[1].replace("m","")) * 60 + int(time[2].replace("s",""))
+            elif time[0].endswith('m'):
+                return int(time[0].replace("m","")) * 60 + int(time[1].replace("s",""))
+            elif time[0].endswith('s'):
+                return int(time[0].replace("s",""))
+            else:
+                raise Exception
+
+        times = re.compile('^\s+?<([0-9a-z-]+)>')   
+        self.timestats.extend([ get_seconds(times.match(line).groups()[0]) for line in self.lines if times.match(line)]) 
+        self.last_time = self.timestats[-1]
+        self.last_memory_time = [ get_seconds(memory.match(line).groups()[0]) for line in self.memstats][-1]
+
+
+    def parse_p2y_log(self):
+        """ Get ERRORS and WARNINGS from p2y l_*  file, useful for debugging
+            Get *Writing* lines, useful to tell if 'aiida' directory was created.
+        """
+        if not hasattr(self, 'lines'):
+            with open('%s/%s'%(self.folder,self.filename)) as fl:
+                self.lines = fl.readlines()
         p2y_complete = re.compile('^(\s+)?[-<>\d\w]+\s+?P\d+[:]\s+?==\s+?P2Y\s+?\w+\s+?==(\s+)?') # P2Y Complete
+        p2y_complete_v2 = re.compile('(\s+)?[-<>\w\d]+(\s+)?==(\s+)?P2Y(\s+)?\w+(\s+)?==') # P2Y Complete
+        yambo_wrote = re.compile('(?:\s+)?(?:[<>\w\d]+)(:?\s+)?(?:P\d+[:])(?:\s+)?(?:[[]\w+[]])?(?:\s+)?Writing(?:\s+)?\w+(?:\s+)?')
         for line in self.lines:
-            if p2y_complete.match(line):
+            if p2y_complete.match(line) or p2y_complete_v2.match(line):
                 self.p2y_complete = True
-        
+                self.game_over = True 
+            if yambo_wrote.match(line):
+                self.yambo_wrote = True 
 
     def __bool__(self):
         if self.type == 'unknown':
