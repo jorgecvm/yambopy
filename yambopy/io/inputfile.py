@@ -183,16 +183,75 @@ class YamboIn():
 
         return {"arguments": self.arguments, "variables": self.variables}
 
+    def bse_paral(self,symmetries=True,ndeg=2):
+        """
+        Suggest possible paralelizations for BSE
+        
+        To be finished
+        
+        Arguemnts:
+            symmetries -> choose wheter the system has symmetries or not
+        """
+
+        #get relevant dimensions
+        nelectrons = int(self['Nelectro'][0])
+        minband, maxband = self['BSEBands'][0]
+        kmin, kmax = self['QpntsRXs'][0]
+        nkpoints = int(kmax)-int(kmin)+1
+        ivalence = nelectrons/ndeg #index of valence ban
+        nvalence = ivalence-minband+1
+        nconduction = maxband-ivalence
+
+        print "\ninformation about the system:"
+        print "nkpoints:  ",nkpoints
+        print "nelectrons:",nelectrons
+        print "conduction:",nconduction
+        print "valence:   ",nvalence
+    
+        print "\nparalelization:"
+        bse_roles = self['BS_ROLEs'].split()
+        bse_cpu = self['BS_CPUs'].split()
+        paralelization = dict(zip(bse_roles,map(int,bse_cpu)))
+
+        if 'k'  not in paralelization: paralelization['k']  = 1
+        if 'eh' not in paralelization: paralelization['eh'] = 1
+        if 't'  not in paralelization: paralelization['t']  = 1
+        print 'k: ', paralelization['k']
+        print 'eh:',paralelization['eh']
+        print 't: ', paralelization['t']
+
+        def chunks(l, n):
+            """
+            Yield successive n-sized chunks from l.
+            """
+            for i in range(0, len(l), n):
+                yield l[i:i + n]
+
+        neh = nkpoints*nvalence*nconduction
+        nkpoints_per_cpu = nkpoints/paralelization['k']
+        eh_per_cpu = nkpoints_per_cpu*paralelization['eh']
+
+
+        print "\ndistribution:"
+        print "kpoints:     ",list(chunks(range(nkpoints),nkpoints_per_cpu))
+        print "(eh):        ",eh_per_cpu
+        print "(eh)->(eh)': ",eh_per_cpu*(eh_per_cpu+1)/2 
+        print "conduction:  ",
+        print "valence:     ",
+
     def optimize(self,conv,variables=('all',),run=lambda x: None,ref_run=True):
-        """ Function to to make multiple runs of yambo to converge calculation parameters
-            Input:
+        """ 
+        Function to to make multiple runs of yambo to converge calculation parameters
+            
+        Arguments:
             A dictionary conv that has all the variables to be optimized
             A list fo the name of the variables in the dicitonary that are to be optimized
             A function run that takes as input the name of the inputfile (used to run yambo)
             A boolean ref_run that can disable the submitting of the reference run (see scripts/analyse_gw.py)
-            .. code-block:: python
-                def run(filename):
-                    os.system('yambo -F %s'%filename)
+
+        .. code-block:: python
+            def run(filename):
+                os.system('yambo -F %s'%filename)
         """
         name_files = []
 
@@ -300,7 +359,7 @@ class YamboIn():
 
         for key,value in self.variables.items():
             if type(value)==str or type(value)==unicode:
-                s+= "%s = %10s\n"%(key,"'%s'"%value)
+                s+= "%s = %10s\n"%(key,"\"%s\""%value)
                 continue
             if type(value[0])==float:
                 val, unit = value
