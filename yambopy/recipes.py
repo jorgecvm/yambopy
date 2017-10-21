@@ -78,9 +78,9 @@ def analyse_gw(folder,var,bandc,kpointc,bandv,kpointv,pack,text,draw):
     data = YamboAnalyser(folder)
 
     # extract data according to relevant variable
-    outvars = data.get_data(var)
+    outvars = data.get_data(tags=(var,'reference'))
     invars = data.get_inputfiles_tag(var)
-    tags = data.get_tags(var)
+    tags = data.get_tags(tags=(var,'reference'))
 
     # Get only files related to the convergence study of the variable,
     # ordered to have a smooth plot
@@ -96,7 +96,7 @@ def analyse_gw(folder,var,bandc,kpointc,bandv,kpointv,pack,text,draw):
     print 'Files detected:'
     for key in keys:
         print key
- 
+
     print 'Computing values...'
     ### Output
 
@@ -231,7 +231,7 @@ def analyse_bse(folder,var,numbexc,intexc,degenexc,maxexc,pack,text,draw):
             inp = v[1]
         else:
             inp = v
-           
+
         print 'Preparing JSON file. Calling ypp if necessary.'
         ### Creating the 'absorptionspectra.json' file
         # It will contain the exciton energies
@@ -281,7 +281,7 @@ def analyse_bse(folder,var,numbexc,intexc,degenexc,maxexc,pack,text,draw):
         filename = outname+'_excitons.dat'
         np.savetxt(filename,excitons,header=header)
         print filename
-        
+
         ## Spectra
         filename = outname+'_spectra.dat'
         f = open(filename,'w')
@@ -318,7 +318,7 @@ def analyse_bse(folder,var,numbexc,intexc,degenexc,maxexc,pack,text,draw):
         fig = plt.figure(figsize=(6,5))
         matplotlib.rcParams.update({'font.size': 15})
         for spectra in spectras:
-            plt.plot(spectra['x'],spectra['y'],label=spectra['label']) 
+            plt.plot(spectra['x'],spectra['y'],label=spectra['label'])
         plt.xlabel('$\omega$ (eV)')
         plt.ylabel('Im($\epsilon_M$)')
         plt.legend(frameon=False)
@@ -331,7 +331,7 @@ def analyse_bse(folder,var,numbexc,intexc,degenexc,maxexc,pack,text,draw):
         print '-nd flag : no plot produced.'
 
     print 'Done.'
-    
+
     return excitons, spectras
 
 #
@@ -375,8 +375,9 @@ def merge_qp(output,files,verbose=False):
     QP_E_E0_Z_save = np.concatenate(QP_E_E0_Z,axis=1)
 
     #create reference file from one of the files
+    netcdf_format = datasets[0].data_model
     fin  = datasets[0]
-    fout = Dataset(output,'w')
+    fout = Dataset(output,'w',format=netcdf_format)
 
     variables_update = ['QP_table', 'QP_kpts', 'QP_E_Eo_Z']
     variables_save   = [QP_table_save.T, QP_kpts_save.T, QP_E_E0_Z_save]
@@ -503,7 +504,7 @@ def plot_excitons(filename,cut=0.2,size=20):
         ax.yaxis.set_major_locator(plt.NullLocator())
         ax.xaxis.set_major_locator(plt.NullLocator())
         ax.set_aspect('equal')
-    
+
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.01, hspace=0.01)
 
     #remove extension from file

@@ -21,7 +21,7 @@ class YamboFile():
     This is the Yambo file class.
     It takes as input a filename produced by yambo.
     Can be a netcdf or a text file
-    
+
     List of supported NETCDF files:
         -> ndb.QP
 
@@ -39,7 +39,7 @@ class YamboFile():
     def __init__(self,filename,folder='.'):
         self.filename = filename
         self.folder   = folder
-        self.type     = None   
+        self.type     = None
         self.errors   = [] #list of errors
         self.warnings   = [] #list of warnings
         self.memstats   = [] #list of memory allocation statistics
@@ -79,12 +79,12 @@ class YamboFile():
             self.type = 'p2y_log'
         elif any(filename.startswith(prefix) for prefix in self._netcdf_prefixes) and _has_netcdf:
             for sufix in self._netcdf_sufixes:
-                if filename.endswith(sufix): 
+                if filename.endswith(sufix):
                     self.type = 'netcdf_%s'%self._netcdf_sufixes[sufix]
                     break
 
         if self.type is None: self.type = 'unknown'
-        
+
         #parse the file
         self.parse()
 
@@ -120,7 +120,7 @@ class YamboFile():
                  except KeyError:
                      _kdata[k_index[ind]][tags[itag]]  = [ table[ind,itag] ]
 
-        self.data = _kdata 
+        self.data = _kdata
         #self.data = dict(zip(tags,table.T))
 
     def parse_netcdf_gw(self):
@@ -145,9 +145,8 @@ class YamboFile():
                 qp = f.variables['QP_E_Eo_Z'][:]
                 qp = qp[0]+qp[1]*1j
                 data['E'],  data['Eo'], data['Z'] = qp.T
-                data['E-Eo'] = data['E']  -  data['Eo'] 
+                data['E-Eo'] = data['E']  -  data['Eo']
                 self.data=data
-                f.close()
             #new format
             else:
                 E  = f.variables['QP_E'][:]
@@ -156,10 +155,10 @@ class YamboFile():
                 data['Eo']= Eo
                 Z  = f.variables['QP_Z'][:]
                 data['Z'] = Z[:,0] + Z[:,1]*1j
-                data['E-Eo'] = data['E']  -  data['Eo'] 
+                data['E-Eo'] = data['E']  -  data['Eo']
                 self.data=data
-                f.close()
-       
+            f.close()
+
     def parse_netcdf_hf(self):
         """ Parse the netcdf hf file (ndb.HF_and_locXC)
         """
@@ -173,12 +172,12 @@ class YamboFile():
             else:
                 qp =  hf.reshape(-1,7)
                 ib, ibp, ik, rsx, isx, revx, imvx = qp.T
-            data['Sx'] = rsx + isx*1j 
+            data['Sx'] = rsx + isx*1j
             data['Vxc'] = revx + imvx*1j
 
             self.data=data
             f.close()
- 
+
     def parse_report(self):
         """ Parse the report files.
             produces output of this nature:
@@ -204,7 +203,7 @@ class YamboFile():
                 if 'STOP' in err.match(line).groups()[0]:
                     # stop parsing, this is a failed calc.
                     self.errors.append(err.match(line).groups()[0])
-                    return 
+                    return
             if timing.match(line):
                 self.timing.append(timing.match(line).groups()[0] )
             if kpoints.match(line):
@@ -237,19 +236,19 @@ class YamboFile():
                     for qp_data in data_lines:
                         bindex, dft_energy, qp_energy, qp_correction, z_factor, \
                         non_local_xc, local_xc, selfenergy_c = [float (i) for i in extract.match(qp_data).groups()]
-                        kp_results['bindex'].append(bindex) 
-                        kp_results['dft_energy'].append(dft_energy) 
-                        kp_results['qp_energy'].append(qp_energy) 
-                        kp_results['qp_correction'].append(qp_correction) 
-                        kp_results['z_factor'].append(z_factor) 
-                        kp_results['non_local_xc'].append(non_local_xc) 
-                        kp_results['local_xc'].append(local_xc) 
-                        kp_results['selfenergy_c'].append(selfenergy_c) 
+                        kp_results['bindex'].append(bindex)
+                        kp_results['dft_energy'].append(dft_energy)
+                        kp_results['qp_energy'].append(qp_energy)
+                        kp_results['qp_correction'].append(qp_correction)
+                        kp_results['z_factor'].append(z_factor)
+                        kp_results['non_local_xc'].append(non_local_xc)
+                        kp_results['local_xc'].append(local_xc)
+                        kp_results['selfenergy_c'].append(selfenergy_c)
             qp_results[kp_index] = kp_results
-        self.data = qp_results 
+        self.data = qp_results
 
     def get_type(self):
-        """ Get the type of file        
+        """ Get the type of file
         """
         return self.type
 
@@ -265,7 +264,7 @@ class YamboFile():
         return False
 
     def get_data(self):
-        """ Get the data from this file as a dictionary 
+        """ Get the data from this file as a dictionary
         """
         pass
 
