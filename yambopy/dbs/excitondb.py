@@ -1739,3 +1739,273 @@ class YamboExcitonDB(YamboSaveDB):
     
     def __str__(self):
         return self.get_string()
+
+
+'''
+    def plot_exciton_3D_ax(self,ax,excitons,plane = None,f=None,mode='hexagon',limfactor=0.8,**kwargs):
+        """
+        Plot the exciton weights in a 3D Brillouin zone
+
+           Arguments:
+            excitons -> list of exciton indexes to plot
+            f -> function to apply to the exciton weights. Ex. f=log will compute the
+                 log of th weight to enhance the small contributions
+            mode -> possible values are 'hexagon' to use hexagons as markers for the
+                    weights plot and 'rbf' to interpolate the weights using radial basis functions.
+            limfactor -> factor of the lattice parameter to choose the limits of the plot
+            scale -> size of the markers
+        """
+        x,y,z,weights_bz_sum = self.get_exciton_3D(excitons,f=f)
+
+        kxnew = np.zeros(len(x))
+        kynew = np.zeros(len(y))
+        kznew = np.zeros(len(z))
+        wnew = np.zeros(len(weights_bz_sum))
+
+        if plane == '111':
+
+          for i in range(0,len(z)):
+            if x[i] - y[i] < 1e-3 and y[i] - x[i] < 1e-3 :
+             kznew[i] = z[i]
+             kxnew[i] = x[i]
+             kynew[i] = y[i]
+             wnew[i] = weights_bz_sum[i]
+            else:
+             kznew[i] = 300
+             kxnew[i] = 300
+             kynew[i] = 300
+             wnew[i] = 300
+
+          kxnew = kxnew[kxnew!=300]
+          kynew = kynew[kynew!=300]
+          kznew = kznew[kznew!=300]
+          wnew = wnew[wnew!=300]
+
+          lim = np.max(self.lattice.rlat)*limfactor
+          dlim = lim*1.1
+          filtered_weights = [[xi,yi,zi,di] for xi,yi,zi,di in zip(kxnew,kynew,kznew,wnew) if -dlim<xi and xi<dlim and -dlim<yi and yi<dlim and -dlim<zi and zi<dlim]
+          kxnew,kynew,kznew,wnew = np.array(filtered_weights).T
+
+          #plotting
+          if mode == 'hexagon':
+              scale = kwargs.pop('scale',10)
+              ax.scatter(kxnew,kznew,s=scale,marker='H',c=wnew,rasterized=True,**kwargs)
+              ax.set_xlim(-lim,lim)
+              ax.set_ylim(-lim,lim)
+          elif mode == 'rbf':
+              from scipy.interpolate import Rbf
+              npts = kwargs.pop('npts',1000)
+              interp_method = kwargs.pop('interp_method','bicubic')
+              rbfi = Rbf(kxnew,kznew,wnew,function='cubic')
+              kxnew = kznew = np.linspace(-lim,lim,npts)
+              wnew = np.zeros([npts,npts])
+              for col in range(npts):
+                  wnew[:,col] = rbfi(kxnew,np.ones_like(kxnew)*kznew[col])
+              ax.imshow(wnew,interpolation=interp_method,cmap = 'viridis')
+
+          title = kwargs.pop('title','Excitons on plane 111')
+
+          ax.set_title(title)
+          ax.set_aspect('auto')
+          ax.set_xticks([])
+          ax.set_yticks([])
+          ax.add_patch(BZ_hexagon(self.lattice.rlat))
+          return ax
+
+        if plane == '001':
+          for i in range(0,len(z)):
+            if -0.004 < z[i] < 0.004:
+              kznew[i] = z[i]
+              kxnew[i] = x[i]
+              kynew[i] = y[i]
+              wnew[i] = weights_bz_sum[i]
+            else:
+              kznew[i] = 300
+              kxnew[i] = 300
+              kynew[i] = 300
+              wnew[i] = 300
+
+          kxnew = kxnew[kxnew!=300]
+          kynew = kynew[kynew!=300]
+          kznew = kznew[kznew!=300]
+          wnew = wnew[wnew!=300]
+          lim = np.max(self.lattice.rlat)*limfactor
+          dlim = lim*1.1
+
+          #plotting
+          if mode == 'hexagon':
+              scale = kwargs.pop('scale',10)
+              ax.scatter(kxnew,kynew,s=scale,marker='H',c=wnew,rasterized=True,**kwargs)
+              ax.set_xlim(-lim,lim)
+              ax.set_ylim(-lim,lim)
+          elif mode == 'rbf':
+              from scipy.interpolate import Rbf
+              npts = kwargs.pop('npts',1000)
+              interp_method = kwargs.pop('interp_method','bicubic')
+              rbfi = Rbf(kxnew,kynew,wnew,function='cubic')
+              kxnew = kynew = np.linspace(-lim,lim,npts)
+              wnew = np.zeros([npts,npts])
+              for col in range(npts):
+                  wnew[:,col] = rbfi(kxnew,np.ones_like(kxnew)*kynew[col])
+              ax.imshow(wnew,interpolation=interp_method,vmin=0,vmax=0.3, cmap = 'coolwarm')
+
+          title = kwargs.pop('title','Excitons on plane 001')
+
+          ax.set_title(title)
+          ax.set_aspect('auto')
+          ax.set_xticks([])
+          ax.set_yticks([])
+          ax.add_patch(BZ_hexagon(self.lattice.rlat))
+          return ax
+
+        if plane == '010':
+          for i in range(0,len(y)):
+            if -0.004 < y[i] < 0.004:
+              kznew[i] = z[i]
+              kxnew[i] = x[i]
+              kynew[i] = y[i]
+              wnew[i] = weights_bz_sum[i]
+            else:
+              kznew[i] = 300
+              kxnew[i] = 300
+              kynew[i] = 300
+              wnew[i] = 300
+
+          kxnew = kxnew[kxnew!=300]
+          kynew = kynew[kynew!=300]
+          kznew = kznew[kznew!=300]
+          wnew = wnew[wnew!=300]
+
+          lim = np.max(self.lattice.rlat)*limfactor
+          dlim = lim*1.1
+
+          #plotting
+          if mode == 'hexagon':
+              scale = kwargs.pop('scale',10)
+              ax.scatter(kxnew,kznew,s=scale,marker='H',c=wnew,rasterized=True,**kwargs)
+              ax.set_xlim(-lim,lim)
+              ax.set_ylim(-lim,lim)
+          elif mode == 'rbf':
+              from scipy.interpolate import Rbf
+              npts = kwargs.pop('npts',1000)
+              interp_method = kwargs.pop('interp_method','bicubic')
+              rbfi = Rbf(kxnew,kznew,wnew,function='cubic')
+              kxnew = kznew = np.linspace(-lim,lim,npts)
+              wnew = np.zeros([npts,npts])
+              for col in range(npts):
+                  wnew[:,col] = rbfi(kxnew,np.ones_like(kxnew)*kznew[col])
+              ax.imshow(wnew,interpolation=interp_method,vmin=0,vmax=0.3, cmap = 'coolwarm')
+
+          title = kwargs.pop('title','Excitons on plane 010')
+
+          ax.set_title(title)
+          ax.set_aspect('auto')
+          ax.set_xticks([])
+          ax.set_yticks([])
+          ax.add_patch(BZ_hexagon(self.lattice.rlat))
+          return ax
+
+        if plane == '100':
+          for i in range(0,len(x)):
+            if -0.004 < x[i] < 0.004:
+              kznew[i] = z[i]
+              kxnew[i] = x[i]
+              kynew[i] = y[i]
+              wnew[i] = weights_bz_sum[i]
+            else:
+              kznew[i] = 300
+              kxnew[i] = 300
+              kynew[i] = 300
+              wnew[i] = 300
+
+          kxnew = kxnew[kxnew!=300]
+          kynew = kynew[kynew!=300]
+          kznew = kznew[kznew!=300]
+          wnew = wnew[wnew!=300]
+
+          lim = np.max(self.lattice.rlat)*limfactor
+          dlim = lim*1.1
+
+          filtered_weights = [[xi,yi,zi,di] for xi,yi,zi,di in zip(kxnew,kynew,kznew,wnew) if -dlim<xi and xi<dlim and -dlim<yi and yi<dlim and -dlim<zi and zi<dlim]
+          kxnew,kynew,kznew,wnew = np.array(filtered_weights).T
+
+          #plotting
+          if mode == 'hexagon':
+              scale = kwargs.pop('scale',10)
+              ax.scatter(kxnew,kznew,s=scale,marker='H',c=wnew,rasterized=True,**kwargs)
+              ax.set_xlim(-lim,lim)
+              ax.set_ylim(-lim,lim)
+          elif mode == 'rbf':
+              from scipy.interpolate import Rbf
+              npts = kwargs.pop('npts',1000)
+              interp_method = kwargs.pop('interp_method','bicubic')
+              rbfi = Rbf(kxnew,kznew,wnew,function='cubic')
+              kxnew = kznew = np.linspace(-lim,lim,npts)
+              wnew = np.zeros([npts,npts])
+              for col in range(npts):
+                  wnew[:,col] = rbfi(kxnew,np.ones_like(kxnew)*kznew[col])
+              ax.imshow(wnew,interpolation=interp_method,vmin=0,vmax=0.3, cmap = 'coolwarm')
+
+          title = kwargs.pop('title','Excitons on plane 010')
+
+          ax.set_title(title)
+          ax.set_aspect('auto')
+          ax.set_xticks([])
+          ax.set_yticks([])
+          ax.add_patch(BZ_hexagon(self.lattice.rlat))
+          return ax
+
+        if plane == '100':
+          for i in range(0,len(x)):
+            if -0.004 < x[i] < 0.004:
+              kznew[i] = z[i]
+              kxnew[i] = x[i]
+              kynew[i] = y[i]
+              wnew[i] = weights_bz_sum[i]
+            else:
+              kznew[i] = 300
+              kxnew[i] = 300
+              kynew[i] = 300
+              wnew[i] = 300
+
+          kxnew = kxnew[kxnew!=300]
+          kynew = kynew[kynew!=300]
+          kznew = kznew[kznew!=300]
+          wnew = wnew[wnew!=300]
+
+          lim = np.max(self.lattice.rlat)*limfactor
+          dlim = lim*1.1
+
+          filtered_weights = [[xi,yi,zi,di] for xi,yi,zi,di in zip(kxnew,kynew,kznew,wnew) if -dlim<xi and xi<dlim and -dlim<yi and yi<dlim and -dlim<zi and zi<dlim]
+          kxnew,kynew,kznew,wnew = np.array(filtered_weights).T
+
+          #plotting
+          if mode == 'hexagon':
+              scale = kwargs.pop('scale',10)
+              ax.scatter(kxnew,kznew,s=scale,marker='H',c=wnew,rasterized=True,**kwargs)
+              ax.set_xlim(-lim,lim)
+              ax.set_ylim(-lim,lim)
+          elif mode == 'rbf':
+              from scipy.interpolate import Rbf
+              npts = kwargs.pop('npts',1000)
+              interp_method = kwargs.pop('interp_method','bicubic')
+              rbfi = Rbf(kynew,kznew,wnew,function='cubic')
+              kynew = kznew = np.linspace(-lim,lim,npts)
+              wnew = np.zeros([npts,npts])
+              for col in range(npts):
+                  wnew[:,col] = rbfi(kynew,np.ones_like(kynew)*kznew[col])
+              ax.imshow(wnew,interpolation=interp_method,vmin=0,vmax=0.3, cmap = 'coolwarm')
+
+          title = kwargs.pop('title','Excitons on plane 100')
+
+          ax.set_title(title)
+          ax.set_aspect('auto')
+          ax.set_xticks([])
+          ax.set_yticks([])
+          ax.add_patch(BZ_hexagon(self.lattice.rlat))
+          return ax
+
+
+        else:
+          print('This plane is not considered')
+

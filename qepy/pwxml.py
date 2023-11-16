@@ -495,17 +495,61 @@ class PwXML():
         else:
             print('fmt %s not implemented'%fmt)
 
-    def spin_projection(self,spin_dir=3,folder='.',prefix='bands'):
-        """
+
+    def spin_projection(self,spin_dir=1,folder='.',prefix='bands'):
+
+        '''
         This function reads the spin projection given by bands.x in txt file
         lsigma(i) = .true.
         By default I set the spin direction z ==3
+        '''
 
-        """
-        if spin_dir ==3:  
+
+        if spin_dir == 1:
+        #data_eigen  = open('%s/%s.out'  % (folder,prefix),'r').readlines()
+           data_spin_1 = open('%s/%s.out.1'% (folder,prefix),'r').readlines()
+
+
+           # check consistency file from bands.x and xml file
+           nband = int(findall(r"[-+]?\d*\.\d+|\d+", data_spin_1[0].strip().split()[2]  )[0])
+           nk    = int(data_spin_1[0].strip().split()[-2])
+           nline = int(nband/10)
+           if nband < 10: print("Error, uses only nband => 10 and multiple of 10")
+           if self.nbands != nband or self.nkpoints != nk: print("Warning: Dimensions are different!")
+
+           self.spin_1 = zeros([self.nkpoints,self.nbands])
+
+           for ik in range(self.nkpoints):
+               for ib in range(nline):
+                   ib1, ib2, ib3 = int(ib*10), int((ib+1)*10), int(ik*(nband/10+1)+2+ib)
+                   self.spin_1[ik,ib1:ib2] = list( map(float,data_spin_1[ib3].split()))
+           return self.spin_1
+
+        if spin_dir == 2:
+        #data_eigen  = open('%s/%s.out'  % (folder,prefix),'r').readlines()
+           data_spin_2 = open('%s/%s.out.2'% (folder,prefix),'r').readlines()
+
+
+           # check consistency file from bands.x and xml file
+           nband = int(findall(r"[-+]?\d*\.\d+|\d+", data_spin_2[0].strip().split()[2]  )[0])
+           nk    = int(data_spin_2[0].strip().split()[-2])
+           nline = int(nband/10)
+           if nband < 10: print("Error, uses only nband => 10 and multiple of 10")
+           if self.nbands != nband or self.nkpoints != nk: print("Warning: Dimensions are different!")
+
+           self.spin_2 = zeros([self.nkpoints,self.nbands])
+
+           for ik in range(self.nkpoints):
+               for ib in range(nline):
+                   ib1, ib2, ib3 = int(ib*10), int((ib+1)*10), int(ik*(nband/10+1)+2+ib)
+                   self.spin_2[ik,ib1:ib2] = list( map(float,data_spin_2[ib3].split()))
+           return self.spin_2
+
+
+        if spin_dir == 3:
         #data_eigen  = open('%s/%s.out'  % (folder,prefix),'r').readlines()
            data_spin_3 = open('%s/%s.out.3'% (folder,prefix),'r').readlines()
-           
+
            # check consistency file from bands.x and xml file
            nband = int(findall(r"[-+]?\d*\.\d+|\d+", data_spin_3[0].strip().split()[2]  )[0])
            nk    = int(data_spin_3[0].strip().split()[-2])
@@ -515,10 +559,11 @@ class PwXML():
 
            self.spin_3 = zeros([self.nkpoints,self.nbands])
 
-        for ik in range(self.nkpoints):
-            for ib in range(nline):
-                ib1, ib2, ib3 = int(ib*10), int((ib+1)*10), int(ik*(nband/10+1)+2+ib)
-                self.spin_3[ik,ib1:ib2] = list( map(float,data_spin_3[ib3].split()))
+           for ik in range(self.nkpoints):
+               for ib in range(nline):
+                   ib1, ib2, ib3 = int(ib*10), int((ib+1)*10), int(ik*(nband/10+1)+2+ib)
+                   self.spin_3[ik,ib1:ib2] = list( map(float,data_spin_3[ib3].split()))
+           return self.spin_3
 
     def read_symmetries(self):
         """

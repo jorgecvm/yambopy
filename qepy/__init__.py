@@ -29,6 +29,7 @@ from .dynmat import *
 from .matdyn import *
 from .lattice import *
 from .unfolding import *
+from .unfolding_hdf5 import *
 from .unfoldingyambo import *
 from .supercell import *
 from .upf_interface.ppupf import *

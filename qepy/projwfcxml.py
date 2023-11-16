@@ -23,7 +23,7 @@ class ProjwfcXML(object):
     """
     _proj_file = 'atomic_proj.xml'
 
-    def __init__(self,prefix,output_filename='projwfc.log',path='.',qe_version='6.1'):
+    def __init__(self,prefix,output_filename='projwfc.log',path='.',qe_version='7.0'):
         """
         Initialize the structure with the path where the atomic_proj.xml is
         The zero energy is fixed at the Fermi energy
@@ -210,7 +210,7 @@ class ProjwfcXML(object):
         if bandmax is None:
            bandmax = self.nbands
 
-        if self.spin_components == 1:
+        if self.spin_components == 1 or self.spin_components == 4:
 
            # Selection of the bands
            w_proj = zeros([self.nkpoints,self.nbands])
