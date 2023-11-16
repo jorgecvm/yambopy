@@ -625,7 +625,7 @@ class PwXML():
 
         if verbose: print("%d kpoints expanded to %d"%(self.nkpoints,len(kpoints_full)))
 
-        #set the variables
+        #set the variables q
         self.weights_ibz      = np.array(weights)
         self.kpoints_indices  = np.array(kpoints_indices)
         self.symmetry_indices = np.array(symmetry_indices)
