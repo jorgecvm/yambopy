@@ -109,7 +109,7 @@ class YamboLatticeDB(object):
 
     @property
     def iku_kpoints(self):
-        return self._iku_kpoints
+        return np.array(self._iku_kpoints)
 
     @iku_kpoints.setter
     def iku_kpoints(self,value):

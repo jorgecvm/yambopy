@@ -56,7 +56,7 @@ def BZ_Wigner_Seitz(lattice,center=(0.,0.),orientation=np.radians(30),color='whi
         print("[WARNING] Lattice type %s currently not supported for drawing BZ borders")
         return NoPatch
 
-def BZ_hexagon(rlat,center=(0.,0.),orientation=np.radians(30),color='white',linewidth=2):
+def BZ_hexagon(rlat,center=(0.,0.),orientation=np.radians(30),color='white',linewidth=1):
     """
     Returns hexagonal borders of 2D Wigner-Seitz cells to aid in k/q-space plotting
     to be added with ax.add_patch(BZ_hexagon)
@@ -74,7 +74,7 @@ def BZ_hexagon(rlat,center=(0.,0.),orientation=np.radians(30),color='white',line
     # Matplotlib patch
     hexagon=RegularPolygon(center,numVertices=6,radius=radius,\
                            orientation=orientation,facecolor=to_rgba('white',0.),\
-                           edgecolor=to_rgba(color,1.),linewidth=linewidth)
+                           edgecolor=to_rgba(color,1.),linewidth=1.5)
 
     return hexagon
 

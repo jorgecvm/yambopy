@@ -309,7 +309,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
             #add weights
             sum_weights = 0
             for t,kcv in enumerate(self.table):
-                k,c,v = kcv[0:3]-1    # This is bug's source between yambo 4.4 and 5.0 
+                k,v,c = kcv[0:3]-1    # This is bug's source between yambo 4.4 and 5.0 
                 this_weight = abs2(eivec[t])
                 weights[k,c] += this_weight
                 weights[k,v] += this_weight
@@ -323,8 +323,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         ''' This function calculate the weights of each band for given k and
         k-q. Still not sure if it is correct
         '''
-
-        print(kindx)
 
         weights_v = np.zeros([self.nkpoints,self.nbands]) ### Why not to use # of bands instead of all the bands?
         weights_c = np.zeros([self.nkpoints,self.nbands])
@@ -344,11 +342,12 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                 this_weight = abs2(eivec[t])
                 weights_v[k_v,v] += this_weight
                 weights_c[k_c,c] += this_weight
-                #weights[k,c] += this_weight
-                #weights[k,v] += this_weight
-                sum_weights += this_weight
-            if abs(sum_weights - 1) > 1e-3: raise ValueError('Excitonic weights does not sum to 1 but to %lf.'%sum_weights)
+                if weights_c[k_c,c] > 0.05:
+                   print(k_v, self.lattice.red_kpoints[k_v], k_c, self.lattice.red_kpoints[k_c], c, v, weights_c[k_c,c]) 
 
+                sum_weights += this_weight 
+            if abs(sum_weights - 1) > 1e-3: raise ValueError('Excitonic weights does not sum to 1 but to %lf.'%sum_weights)
+        print(weights_c[13,2])
         return weights_v, weights_c
 
     
@@ -759,14 +758,17 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         print('Q = ', self.Qpt)   # Check Q convention
 
         weights_v, weights_c = self.get_exciton_weights_finiteq(excitons,self.Qpt,kindx)
-        #weights = weights[:,self.start_band:self.mband]   
-     
+
+        print(weights_c)
+
         size_v = 0.0 
         size_c = 0.0
 
-        if f: weights_v = f(weights_v)
-        size_v *= 1.0/np.max(weights_v)
-        size_c *= 1.0/np.max(weights_c)
+        size_v = np.max(weights_v)
+        size_c = np.max(weights_c)
+
+        print(size_v,size_c)
+
         ibz_nkpoints = max(lattice.kpoints_indexes)+1
 
         #kpoints = lattice.red_kpoints   This is not needed, why is here? To be removed
@@ -775,7 +777,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         # bug here? it is self.mband, but why? Start counting at zero?
 
         ibz_weights_v = np.zeros([ibz_nkpoints,self.nbands]) 
-        ibz_weights_c = np.zeros([ibz_nkpoints,self.nbands]) 
+        ibz_weights_c = np.zeros([ibz_nkpoints,self.nbands])
         ibz_kpoints = np.zeros([ibz_nkpoints,3]) 
 
         # Kpoints indexes must be read from a SAVEDB Class
@@ -784,9 +786,11 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         # Fijar este error
         for idx_bz,idx_ibz in enumerate(kpoints_indexes):
-            ibz_weights_v[idx_ibz,:] = weights_v[idx_bz,:]
-            ibz_weights_c[idx_ibz,:] = weights_c[idx_bz,:] 
+            ibz_weights_v[idx_ibz,:] += weights_v[idx_bz,:]
+            ibz_weights_c[idx_ibz,:] += weights_c[idx_bz,:] 
             ibz_kpoints[idx_ibz] = lattice.red_kpoints[idx_bz]
+
+
 
         #get eigenvalues along the path
         if isinstance(energies,(YamboSaveDB,YamboElectronsDB)):
@@ -820,9 +824,9 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         exc_bands_v = YambopyBandStructure(energies[0],kpoints_path,kpath=path,weights=exc_weights_v[0],size=size_v,**kwargs)
         exc_bands_c = YambopyBandStructure(energies[0],kpoints_path,kpath=path,weights=exc_weights_c[0],size=size_c,**kwargs) 
         #exc_bands.set_fermi(self.nvbands)
+       
 
-
-        return exc_bands_v, exc_bands_c
+        return exc_bands_v, exc_bands_c, size_v, size_c
 
 
 

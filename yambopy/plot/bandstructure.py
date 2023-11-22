@@ -210,7 +210,7 @@ class YambopyBandStructure():
             ax.xaxis.set_ticks([])
             return 
         for kpoint, klabel, distance in self.kpath:
-            ax.axvline(distance,c='k',ls='--',lw=0.5)
+            ax.axvline(distance,c='k',linestyle = 'dashed', dashes = (5,6), lw = 0.4, alpha = 0.5)
         ax.axvline(0.0,c='k',ls='-',lw=0.0)
         ax.axvline(distance,c='k',ls='-',lw=0.0)
         self.kpath.set_xticks(ax)
@@ -234,8 +234,8 @@ class YambopyBandStructure():
         color_map  = plt.get_cmap('seismic')
         for ib,band in enumerate(self.bands.T):
             x = self.distances
-            y = band-fermie
-            ax.plot(x,y,c=c_bands,lw=lw_label,label=c_label)
+            y = band-fermie+1.681
+            ax.plot(x,y,c=c_bands,lw=lw_label,label=c_label, alpha = 0.6)
             # fill between 
             if self.weights is not None: # and self.spin_proj is not None:
                 dy = self.weights[:,ib]*size

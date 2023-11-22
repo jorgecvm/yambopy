@@ -706,7 +706,7 @@ class YamboExcitonDB(YamboSaveDB):
             #add weights
             sum_weights = 0
             for t,kcv in enumerate(self.table):
-                k,c,v = kcv[0:3]-1    # This is bug's source between yambo 4.4 and 5.0 
+                k,v,c = kcv[0:3]-1    # This is bug's source between yambo 4.4 and 5.0 
                 this_weight = abs2(eivec[t])
                 weights[k,c] += this_weight
                 weights[k,v] += this_weight
@@ -874,7 +874,7 @@ class YamboExcitonDB(YamboSaveDB):
                s=ax.imshow(weights_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim])
         title = kwargs.pop('title',str(excitons))
 
-        ax.set_title(title)
+        #ax.set_title(title)
         ax.set_aspect('equal')
         ax.set_xticks([])
         ax.set_yticks([])
