@@ -342,12 +342,11 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                 this_weight = abs2(eivec[t])
                 weights_v[k_v,v] += this_weight
                 weights_c[k_c,c] += this_weight
-                if weights_c[k_c,c] > 0.05:
-                   print(k_v, self.lattice.red_kpoints[k_v], k_c, self.lattice.red_kpoints[k_c], c, v, weights_c[k_c,c]) 
+                #if weights_c[k_c,c] > 0.02:
+                   #print(k_v, self.lattice.red_kpoints[k_v], k_c, self.lattice.red_kpoints[k_c], v, c, weights_c[k_c,c]) 
 
                 sum_weights += this_weight 
             if abs(sum_weights - 1) > 1e-3: raise ValueError('Excitonic weights does not sum to 1 but to %lf.'%sum_weights)
-        print(weights_c[13,2])
         return weights_v, weights_c
 
     
@@ -785,13 +784,42 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         kpoints_indexes = k2
 
         # Fijar este error
+
+
+        vmax = np.zeros([self.nkpoints,self.nbands])
+        cmax = np.zeros([self.nkpoints,self.nbands])
+
         for idx_bz,idx_ibz in enumerate(kpoints_indexes):
-            ibz_weights_v[idx_ibz,:] += weights_v[idx_bz,:]
-            ibz_weights_c[idx_ibz,:] += weights_c[idx_bz,:] 
-            ibz_kpoints[idx_ibz] = lattice.red_kpoints[idx_bz]
 
+            if idx_ibz == 0:
+               ibz_weights_v[idx_ibz,:] = weights_v[idx_bz,:]
+               ibz_weights_c[idx_ibz,:] = weights_c[idx_bz,:]
+               print('A',idx_ibz,idx_bz)
 
+            if idx_ibz != 0:
+              
+               if idx_ibz != kpoints_indexes[idx_bz-1]:
 
+                  ibz_weights_v[idx_ibz,:] = weights_v[idx_bz,:]
+                  ibz_weights_c[idx_ibz,:] = weights_c[idx_bz,:]
+                  vmax[idx_bz,:] = weights_v[idx_bz,:]
+                  cmax[idx_bz,:] = weights_c[idx_bz,:]
+                  print('B',idx_ibz,idx_bz) 
+
+               if idx_ibz == kpoints_indexes[idx_bz-1]:
+                  
+                  for v in range(self.nvbands):
+                      vmax[idx_bz,v] = max(weights_v[idx_bz,v],vmax[idx_bz - 1,v])
+                      ibz_weights_v[idx_ibz,v] = vmax[idx_bz,v]
+
+                  for c in range(self.nvbands,self.nbands):
+                      cmax[idx_bz,c] = max(weights_c[idx_bz,c],cmax[idx_bz - 1,c])
+                      ibz_weights_c[idx_ibz,c] = cmax[idx_bz,c]
+                  
+                  print('C',idx_ibz,idx_bz)
+
+            ibz_kpoints[idx_ibz] = lattice.red_kpoints[idx_bz]    
+           
         #get eigenvalues along the path
         if isinstance(energies,(YamboSaveDB,YamboElectronsDB)):
             ibz_energies = energies.eigenvalues[0,:,self.start_band:self.mband]

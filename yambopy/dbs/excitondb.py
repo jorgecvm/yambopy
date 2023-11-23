@@ -1125,7 +1125,8 @@ class YamboExcitonDB(YamboSaveDB):
         # Fijar este error
         for idx_bz,idx_ibz in enumerate(kpoints_indexes):
             ibz_weights[idx_ibz,:] = weights[idx_bz,:] 
-            ibz_kpoints[idx_ibz] = lattice.red_kpoints[idx_bz]
+            print(idx_ibz, idx_bz, ibz_weights[idx_ibz,:])
+            ibz_kpoints[idx_ibz] = lattice.red_kpoints[idx_bz] 
         #get eigenvalues along the path
         if isinstance(energies,(YamboSaveDB,YamboElectronsDB)):
             ibz_energies = energies.eigenvalues[0,:,self.start_band:self.mband]
@@ -1145,7 +1146,7 @@ class YamboExcitonDB(YamboSaveDB):
         skw = SkwInterpolator(lpratio,ibz_kpoints,ibz_weights[na,:,:],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
         kpoints_path = path.get_klist()[:,:3]
         exc_weights = skw.interp_kpts(kpoints_path).eigens
-
+        print(exc_weights)
         #create band-structure object
         exc_bands = YambopyBandStructure(energies[0],kpoints_path,kpath=path,weights=exc_weights[0],size=size,**kwargs)
         #exc_bands.set_fermi(self.nvbands)
