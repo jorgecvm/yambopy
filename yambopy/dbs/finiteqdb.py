@@ -1,4 +1,3 @@
-
 from yambopy.units import *
 from yambopy.plot.plotting import add_fig_kwargs,BZ_Wigner_Seitz
 from yambopy.plot.bandstructure import *
@@ -8,6 +7,8 @@ from yambopy.dbs.savedb import *
 from yambopy.dbs.latticedb import *
 from yambopy.dbs.electronsdb import *
 from yambopy.dbs.qpdb import *
+from matplotlib import cm
+import matplotlib.pyplot as plt
 
 
 
@@ -418,6 +419,23 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         return x,y,weights_bz_sum_up,weights_bz_sum_dw
  
+    def get_exciton_2D_finite_q(self,excitons,iq,kindx,f=None):
+        """get data of the exciton in 2D for finite-q"""
+        weights_v, weights_c  = self.get_exciton_weights_finiteq(excitons,self.Qpt,kindx) 
+
+        #sum all the bands for valence and conduction
+        weights_v_bz_sum = np.sum(weights_v,axis=1)
+        weights_c_bz_sum = np.sum(weights_c,axis=1)
+
+        if f: weights_v_bz_sum = f(weights_v_bz_sum)
+        if f: weights_c_bz_sum = f(weights_c_bz_sum)
+
+        kmesh_full, kmesh_idx = replicate_red_kmesh(self.lattice.red_kpoints,repx=range(-1,2),repy=range(-1,2))
+        x,y = red_car(kmesh_full,self.lattice.rlat)[:,:2].T
+        weights_v_bz_sum = weights_v_bz_sum[kmesh_idx]
+        weights_c_bz_sum = weights_c_bz_sum[kmesh_idx]
+        return x,y,weights_v_bz_sum,weights_c_bz_sum
+
     def plot_exciton_2D_ax(self,ax,excitons,f=None,mode='hexagon',limfactor=0.8,spin_pol=None,**kwargs):
         """
         Plot the exciton weights in a 2D Brillouin zone
@@ -515,6 +533,100 @@ class YamboExcitonFiniteQ(YamboSaveDB):
        
         return ax,s
 
+ 
+    def plot_exciton_2D_ax_finiteq(self,ax,bx,iq,kindx,excitons,f=None,mode='hexagon',limfactor=0.8,spin_pol=None,**kwargs):
+        """
+        Plot the exciton weights in a 2D Brillouin zone for finite-q where the plots in valence and conduction are different
+       
+
+           Arguments:
+            excitons -> list of exciton indexes to plot
+            f -> function to apply to the exciton weights. Ex. f=log will compute the 
+                 log of th weight to enhance the small contributions
+            mode -> possible values are 'hexagon'/'square' to use hexagons/squares as markers for the 
+                    weights plot and 'rbf' to interpolate the weights using radial basis functions.
+
+            limfactor -> factor of the lattice parameter to choose the limits of the plot 
+            scale -> size of the markers
+        """
+        
+        x,y,weights_v_bz_sum,weights_c_bz_sum = self.get_exciton_2D_finite_q(excitons,self.Qpt,kindx,f=f)
+
+        weights_v_bz_sum=weights_v_bz_sum/np.max(weights_v_bz_sum)
+        weights_c_bz_sum=weights_c_bz_sum/np.max(weights_c_bz_sum)
+
+        #filter points outside of area
+        lim = np.max(self.lattice.rlat)*limfactor
+        dlim = lim*1.1
+
+        filtered_weights_v = [[xi,yi,di] for xi,yi,di in zip(x,y,weights_v_bz_sum) if -dlim<xi and xi<dlim and -dlim<yi and yi<dlim]
+        x_v,y_v,weights_v_bz_sum = np.array(filtered_weights_v).T
+
+        filtered_weights_c = [[xi,yi,di] for xi,yi,di in zip(x,y,weights_c_bz_sum) if -dlim<xi and xi<dlim and -dlim<yi and yi<dlim]
+        x_c,y_c,weights_c_bz_sum = np.array(filtered_weights_c).T
+
+        # Add contours of BZ
+        ax.add_patch(BZ_Wigner_Seitz(self.lattice, color = 'black'))
+        bx.add_patch(BZ_Wigner_Seitz(self.lattice, color = 'black'))
+
+
+        #plotting
+        if mode == 'hexagon': 
+            scale = kwargs.pop('scale',1)   
+            s_v=ax.scatter(x_v,y_v,s=scale,marker='H',c=weights_v_bz_sum,rasterized=True,**kwargs)
+            s_c=bx.scatter(x_c,y_c,s=scale,marker='H',c=weights_c_bz_sum,rasterized=True,**kwargs)
+            ax.set_xlim(-lim,lim)
+            ax.set_ylim(-lim,lim)
+            bx.set_xlim(-lim,lim)
+            bx.set_ylim(-lim,lim)
+
+        elif mode == 'square': 
+            scale = kwargs.pop('scale',1)
+            if spin_pol is 'up':
+               s=ax.scatter(x,y,s=scale,marker='s',c=weights_bz_sum_up,rasterized=True,**kwargs)
+            elif spin_pol is 'dw':
+               s=ax.scatter(x,y,s=scale,marker='s',c=weights_bz_sum_dw,rasterized=True,**kwargs)
+            else:
+               s=ax.scatter(x,y,s=scale,marker='s',c=weights_bz_sum,rasterized=True,**kwargs)
+            ax.set_xlim(-lim,lim)
+            ax.set_ylim(-lim,lim)
+     
+        elif mode == 'rbf':
+            from scipy.interpolate import Rbf
+            npts = kwargs.pop('npts',100)
+            interp_method = kwargs.pop('interp_method','bicubic')
+
+
+            rbfi_v = Rbf(x_v,y_v,weights_v_bz_sum,function='linear')
+            x_v = y_v = np.linspace(-lim,lim,npts)
+            weights_v_bz_sum = np.zeros([npts,npts])
+
+            rbfi_c = Rbf(x_c,y_c,weights_c_bz_sum,function='linear')
+            x_c = y_c = np.linspace(-lim,lim,npts)
+            weights_c_bz_sum = np.zeros([npts,npts])
+
+            for col in range(npts): 
+                weights_v_bz_sum[:,col] = rbfi_v(x_v,np.ones_like(x_v)*y_v[col])
+                weights_c_bz_sum[:,col] = rbfi_c(x_c,np.ones_like(x_c)*y_c[col])
+                cmap_v = plt.cm.Blues
+                cmap_c = plt.cm.Reds
+                s_v=ax.imshow(weights_v_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = cmap_v, alpha = 1.0)
+                s_c=ax.imshow(weights_c_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = cmap_c, alpha = 0.5)
+       
+        title = kwargs.pop('title',str(excitons))
+
+        ax.set_title(title)
+        ax.set_aspect('equal')
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        bx.set_title(title)
+        bx.set_aspect('equal')
+        bx.set_xticks([])
+        bx.set_yticks([])
+
+        return ax,bx,s_v,s_c
+    
     def get_exciton_3D(self,excitons,f=None):
         """get data of the exciton in 2D"""
         weights = self.get_exciton_weights(excitons)
