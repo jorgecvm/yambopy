@@ -658,7 +658,7 @@ class YamboExcitonDB(YamboSaveDB):
                 for i_k in range(nkpoints_path):
                     for i_v in range(self.nvbands):
                         delta = 1.0/( omega_band[i_o] - omega_path[0, i_k, i_v, i_exc] + Im*omega_width ) # check this
-                        Intensity[i_o,i_k] += rho_path[0, i_k, i_v, i_exc]*delta.imag
+                        Intensity[i_o,i_k] += 2*np.pi*rho_path[0, i_k, i_v, i_exc]*delta.imag
 
         X, Y = np.meshgrid(distances, omega_band)
         import matplotlib.pyplot as plt
