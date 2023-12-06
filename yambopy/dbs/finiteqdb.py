@@ -1381,18 +1381,20 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         n_excitons = len(excitons)
 
-        eigenvec_q = np.zeros([len(self.eigenvalues),nqpoints]) 
-        eigenval_q = np.zeros([len(self.eigenvalues),nqpoints]) 
+        eigenval_q = np.zeros([len(self.eigenvalues), nqpoints]) 
+        eigenvec_q = np.zeros([n_excitons, len(self.eigenvectors[0]), nqpoints]) 
 
         for iq in range(nqpoints):
-            for i_l,exciton in enumerate(excitons):
-    
-                yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]                 
 
-                for t in range(len(self.eigenvalues)):
-                    eigenvec_q[t,iq] = yexc_list.eigenvectors[exciton-1,t]
-                    eigenval_q[t,iq] = yexc_list.eigenvalues[t]
-                    print(t,iq)
+            yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]                 
+
+            for t in range(len(self.eigenvalues)):
+                eigenval_q[t,iq] = yexc_list.eigenvalues[t]
+
+            for i_exc,exciton in enumerate(excitons):
+    
+                for t in range(len(self.eigenvectors[0])):
+                    eigenvec_q[exciton-1,t,iq] = yexc_list.eigenvectors[exciton-1,t]
 
         return eigenvec_q, eigenval_q
 
@@ -1424,16 +1426,15 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         for iq in range(self.nqpoints):
 
-            for i_l,exciton in enumerate(excitons):
+            for i_exc,exciton in enumerate(excitons):
 
                 for i_k in range(self.nkpoints):
 
                     for i_v in range(self.nvbands):
 
                         i_v2 = self.unique_vbands[i_v]
-                        k_c = kindx.qindx_X[iq-1,i_k,0] - 1
-                        # omega_vk,lambda      = e_(v,k-q) + omega_(lambda,q)
-                        omega_vkl_q[i_k,i_v,i_l,iq] = energies[k_c,i_v2] + eigenval_q.real[exciton-1,iq]
+                        k_c = kindx.qindx_X[iq,i_k,0] - 1
+                        omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v2] + eigenval_q.real[exciton-1,iq]
 
         return omega_vkl_q
 
@@ -1461,27 +1462,25 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         return rho
 
 
-    def calculate_rho_finiteq(self,excitons,iq,kindx):
+    def calculate_rho_finiteq(self,excitons,kindx):
         """ Calculate:
             rho_vkl = Sum_{q,c} |A_cvk,q,l|^2
         """
         n_excitons = len(excitons)
-        print('self.nqpoints,self.nkpoints, self.nvbands, n_excitons')
+        print('self.nkpoints, self.nvbands, n_excitons,self.nqpoints')
         print(self.nkpoints, self.nvbands, n_excitons, self.nqpoints)
          
-        rho_q = np.zeros([self.nkpoints, self.nvbands, n_excitons,self.nqpoints])
+        rho_q = np.zeros([self.nkpoints, self.nvbands, n_excitons, self.nqpoints])
 
         eigenvec_q, eigenval_q = self.alldata(excitons,self.nqpoints)
 
         for iq in range(self.nqpoints):
 
             for i_exc, exciton in enumerate(excitons):
-                
                 for t,kvc in enumerate(self.table):
                     k,v,c = kvc[0:3]-1    
-                    k_c = kindx.qindx_X[iq-1,k,0] - 1
                     i_v = v - self.unique_vbands[0] 
-                    rho_q[k,i_v,i_exc,iq] += abs2(eigenvec_q[t,iq])
+                    rho_q[k,i_v,i_exc,iq] += abs2(eigenvec_q[exciton-1,t,iq])
 
         return rho_q
 
@@ -1598,9 +1597,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
             skw_omega = SkwInterpolator(lpratio,ibz_kpoints,ibz_omega[na,:,:,i_exc],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
             omega_path[0,:,:,i_exc] = skw_omega.interp_kpts(kpoints_path).eigens
 
-        print(lpratio,ibz_kpoints,fermie,nelect,cell,symrel,time_rev,verbose)
-
-        exit()
         # interpolate energies
         skw_energie = SkwInterpolator(lpratio,ibz_kpoints,ibz_energies[na,:,:],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
         energies_path = skw_energie.interp_kpts(kpoints_path).eigens
@@ -1673,9 +1669,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         if verbose:
            print("This interpolation is provided by the SKW interpolator implemented in Abipy")
 
-
-        print('Q = ', self.Qpt)   # Check Q convention
-
         # Number of exciton states
         n_excitons = len(excitons)
 
@@ -1700,16 +1693,14 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         symrel = [sym for sym,trev in zip(lattice.sym_rec_red,lattice.time_rev_list) if trev==False ]
         time_rev = True
 
-        nelect = 0  # Why?
+        nelect = 0  
 
         # DFT Eigenvalues FBZ
         energies = energies_db.eigenvalues[0,self.lattice.kpoints_indexes] #SPIN-UP
 
-        rho_q = self.calculate_rho_finiteq(excitons,self.Qpt,kindx)
+        rho_q = self.calculate_rho_finiteq(excitons,kindx)
 
         omega_q    = self.calculate_omega_finiteq(energies,excitons,self.Qpt,kindx)
-
-        size *= 1.0/np.max(rho_q)
 
         ibz_nkpoints = max(lattice.kpoints_indexes)+1
         kpoints = lattice.red_kpoints
@@ -1790,8 +1781,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                 skw_omega_q = SkwInterpolator(lpratio,ibz_kpoints,ibz_omega_q[na,:,:,i_exc,iq],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
                 omega_q_path[0,:,:,i_exc,iq] = skw_omega_q.interp_kpts(kpoints_path).eigens
         
-        print(omega_q_path[0,:,:,i_exc,:])
-
         # interpolate energies
 
         skw_energie = SkwInterpolator(lpratio,ibz_kpoints,ibz_energies[na,:,:],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
@@ -1809,13 +1798,14 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         # I(k,omega_band)
         Intensity_q = np.zeros([n_omegas,nkpoints_path]) 
         
-        for i_exc in range(n_excitons):
-            for i_o in range(n_omegas):
-                for i_k in range(nkpoints_path):
-                    for i_v in range(self.nvbands): 
-                        for iq in range(self.nqpoints):
+        for iq in range(self.nqpoints):
+            for i_exc in range(n_excitons):
+                for i_o in range(n_omegas):
+                    for i_k in range(nkpoints_path):
+                        for i_v in range(self.nvbands): 
                             delta_q = 1.0/( omega_band[i_o] - omega_q_path[0, i_k, i_v, i_exc, iq] + Im*omega_width ) # check this
                             Intensity_q[i_o,i_k] += 2*np.pi*Btz_d[i_exc,iq]*rho_q_path[0, i_k, i_v, i_exc, iq]*delta_q.imag
+                            print(i_o,i_k,i_v,i_k,i_exc,iq,Intensity_q[i_o,i_k])
 
         X, Y = np.meshgrid(distances, omega_band)
         import matplotlib.pyplot as plt
