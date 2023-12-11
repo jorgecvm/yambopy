@@ -1494,16 +1494,25 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         k = 8.6173e-5
 
-        sum_den = 0.0
+        print('La temperatura es = ', T, 'K')
+        print('La Beta es = ', (1)/(k*T))
+
+        sum_den = np.zeros(n_excitons)
 
         for i_exc, exciton in enumerate(excitons):
 
+            sum_den[i_exc] = 0.0
+
             for iq in range(self.nqpoints):
-
                 for total_i_exc in range(len(self.eigenvalues)):
-                    sum_den += np.exp( - (eigenval_q.real[total_i_exc,iq]) / (k*T) )
+                    sum_den[i_exc] += np.exp( - (eigenval_q.real[total_i_exc,iq]) / (k*T) )
+        print(sum_den[i_exc])
 
-                Btz_d[i_exc,iq] = ( ( np.exp( - (eigenval_q.real[exciton-1,iq]) / (k*T) ) ) / ( sum_den ) )
+        for i_exc, exciton in enumerate(excitons):
+            for iq in range(self.nqpoints):
+                Btz_d[i_exc,iq] = ( ( np.exp( - (eigenval_q.real[exciton-1,iq]) / (k*T) ) ) / ( sum_den[i_exc] ) )
+
+        print(Btz_d)
 
         return Btz_d
 
@@ -1793,7 +1802,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         import matplotlib.pyplot as plt
 
-        Btz_d = self.Boltz_dist(excitons,300)
+        Btz_d = self.Boltz_dist(excitons,100)
 
         # I(k,omega_band)
         Intensity_q = np.zeros([n_omegas,nkpoints_path]) 
