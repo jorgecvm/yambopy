@@ -1377,27 +1377,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         return rho
 
-    def alldata(self,excitons,nqpoints):
-
-        n_excitons = len(excitons)
-
-        eigenval_q = np.zeros([len(self.eigenvalues), nqpoints]) 
-        eigenvec_q = np.zeros([n_excitons, len(self.eigenvectors[0]), nqpoints]) 
-
-        for iq in range(nqpoints):
-
-            yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]                 
-
-            for t in range(len(self.eigenvalues)):
-                eigenval_q[t,iq] = yexc_list.eigenvalues[t]
-
-            for i_exc,exciton in enumerate(excitons):
-    
-                for t in range(len(self.eigenvectors[0])):
-                    eigenvec_q[exciton-1,t,iq] = yexc_list.eigenvectors[exciton-1,t]
-
-        return eigenvec_q, eigenval_q
-
     def calculate_omega(self,energies,excitons):
         """ Calculate:
             omega_vk,lambda = e_(v,k-q) + omega_(lambda,q) only for q=0
@@ -1414,7 +1393,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
          
         return omega_vkl
 
-    def calculate_omega_finiteq(self,energies,excitons,iq,kindx):
+    def calculate_omega_finiteq(self,energies,energies_db,excitons,kindx, eigenvec_q, eigenval_q):
         """ Calculate:
             omega_vk,lambda,q = e_(v,k-q) + omega_(lambda,q)
         """
@@ -1422,19 +1401,35 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         n_excitons = len(excitons)
         omega_vkl_q = np.zeros([self.nkpoints,self.nvbands,n_excitons,self.nqpoints])
 
-        eigenvec_q, eigenval_q = self.alldata(excitons,self.nqpoints)
+        if isinstance(energies_db,(YamboSaveDB,YamboElectronsDB)):
+           for iq in range(self.nqpoints):
 
-        for iq in range(self.nqpoints):
+               for i_exc,exciton in enumerate(excitons):
 
-            for i_exc,exciton in enumerate(excitons):
+                   for i_k in range(self.nkpoints):
 
-                for i_k in range(self.nkpoints):
+                       for i_v in range(self.nvbands):
 
-                    for i_v in range(self.nvbands):
+                           i_v2 = self.unique_vbands[i_v]
+                           k_c = kindx.qindx_X[iq,i_k,0] - 1
+                           omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v2] + eigenval_q.real[exciton-1,iq]
 
-                        i_v2 = self.unique_vbands[i_v]
-                        k_c = kindx.qindx_X[iq,i_k,0] - 1
-                        omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v2] + eigenval_q.real[exciton-1,iq]
+        elif isinstance(energies_db,YamboQPDB):   # To work correctly, the number of valence bands in BSEBands and the number of valence bands in the GW calculation must be the same.
+             for iq in range(self.nqpoints):
+
+                 for i_exc,exciton in enumerate(excitons):
+
+                     for i_k in range(self.nkpoints):
+
+                         for i_v in range(self.nvbands):
+ 
+                             k_c = kindx.qindx_X[iq,i_k,0] - 1
+                             omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v] + eigenval_q.real[exciton-1,iq]
+
+        else:
+            raise ValueError("Energies argument must be an instance of YamboSaveDB,"
+                             "YamboElectronsDB or YamboQPDB. Got %s"%(type(energies)))
+
 
         return omega_vkl_q
 
@@ -1462,7 +1457,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         return rho
 
 
-    def calculate_rho_finiteq(self,excitons,kindx):
+    def calculate_rho_finiteq(self,excitons,kindx, eigenvec_q, eigenval_q):
         """ Calculate:
             rho_vkl = Sum_{q,c} |A_cvk,q,l|^2
         """
@@ -1471,8 +1466,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         print(self.nkpoints, self.nvbands, n_excitons, self.nqpoints)
          
         rho_q = np.zeros([self.nkpoints, self.nvbands, n_excitons, self.nqpoints])
-
-        eigenvec_q, eigenval_q = self.alldata(excitons,self.nqpoints)
 
         for iq in range(self.nqpoints):
 
@@ -1485,12 +1478,10 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         return rho_q
 
 
-    def Boltz_dist(self,excitons,T):
+    def Boltz_dist(self,excitons,T, eigenvec_q, eigenval_q):
 
         n_excitons = len(excitons)
         Btz_d = np.zeros([n_excitons,self.nqpoints])
-        
-        eigenvec_q, eigenval_q = self.alldata(excitons,self.nqpoints)
 
         k = 8.6173e-5
 
@@ -1516,6 +1507,56 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         return Btz_d
 
+    def Gauss_dist(self, excitons, omega_1, omega_2, omega_step, sigma):
+
+        n_excitons = len(excitons)
+
+        eigenvec_q, eigenval_q = self.alldata(excitons,self.nqpoints)
+
+        omega_band  = np.arange(omega_1,omega_2,omega_step)
+
+        Gauss_dis = np.zeros([len(omega_band), n_excitons, self.nqpoints])
+
+        for w in range(len(omega_band)):
+          
+            for iq in range(self.nqpoints):
+
+                   for i_exc, exciton in enumerate(excitons):
+
+                    Gauss_dis[w,i_exc,iq] += np.exp( -( omega_band[w] - eigenval_q.real[i_exc,iq] )**2 / (2 * sigma**2) ) / ( np.sqrt(2 * np.pi) * sigma )
+                    print(w, i_exc, iq, Gauss_dis[w,i_exc,iq])
+
+        Gauss_dis = Gauss_dis/np.amax(Gauss_dis)
+
+        return Gauss_dis
+
+
+    def exc_DOS(self,excitons, omega_1, omega_2, omega_step, sigma, eigenvec_q, eigenval_q, Btz_d):
+
+        n_excitons = len(excitons)
+
+        omega_band  = np.arange(omega_1,omega_2,omega_step)
+
+        eDOS = np.zeros(len(omega_band))
+        eDOS_Boltz = np.zeros(len(omega_band))
+
+        for i_exc, exciton in enumerate(excitons):
+
+            for w in range(len(omega_band)):
+          
+                for iq in range(self.nqpoints):
+
+                    for total_i_exc in range(len(self.eigenvalues)):
+
+                        eDOS[w] += np.exp( -( omega_band[w] - eigenval_q.real[total_i_exc,iq] )**2 / (2 * sigma**2) ) / ( np.sqrt(2 * np.pi) * sigma )
+                        eDOS_Boltz[w] += Btz_d[i_exc,iq] * np.exp( -( omega_band[w] - eigenval_q.real[total_i_exc,iq] )**2 / (2 * sigma**2) ) / ( np.sqrt(2 * np.pi) * sigma )
+                        print(w, total_i_exc, iq, eDOS[w],eDOS_Boltz[w])
+
+        eDOS_norm = eDOS/np.max(eDOS)
+
+        eDOS_Boltz_norm = eDOS_Boltz/np.max(eDOS_Boltz)
+
+        return omega_band, eDOS_norm, eDOS_Boltz_norm  
 
     #def arpes_interpolate(self,energies,path,excitons,lpratio=5,f=None,size=1,verbose=True,**kwargs):
     def arpes_intensity_interpolated(self,energies_db,path,excitons,lpratio=5,f=None,size=1,verbose=True,**kwargs):
@@ -1663,7 +1704,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         return 
 
 
-    def arpes_intensity_interpolated_finiteq(self,energies_db,kindx,path,excitons,ax,bx,lpratio=5,f=None,size=1,verbose=True,**kwargs):
+    def arpes_intensity_interpolated_finiteq(self,energies_db,kindx,path,excitons,ax,bx,cx,lpratio=5,f=None,size=1,verbose=True,**kwargs):
         
         """ 
             Interpolate arpes bandstructure using SKW interpolation from Abipy (version 1)
@@ -1692,6 +1733,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         omega_step  = kwargs.pop('omega_step',0)
         omega_band  = np.arange(omega_1,omega_2,omega_step)
         n_omegas = len(omega_band)
+        sigma     = kwargs.pop('sigma',0)
         cmap_name   = kwargs.pop('cmap_name',0)
         scissor    = kwargs.pop('scissor',0)
        
@@ -1704,12 +1746,36 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         nelect = 0  
 
-        # DFT Eigenvalues FBZ
-        energies = energies_db.eigenvalues[0,self.lattice.kpoints_indexes] #SPIN-UP
+        #get DFT or GW eigenvalues
+        if isinstance(energies_db,(YamboSaveDB,YamboElectronsDB)):
+            energies = energies_db.eigenvalues[0,self.lattice.kpoints_indexes] #spin-up
+        elif isinstance(energies_db,YamboQPDB):   # Check this works !!!!
+            energies = energies_db.expand_eigenvalues(self.lattice)
+            print(energies)
+        else:
+            raise ValueError("Energies argument must be an instance of YamboSaveDB,"
+                             "YamboElectronsDB or YamboQPDB. Got %s"%(type(energies)))
 
-        rho_q = self.calculate_rho_finiteq(excitons,kindx)
+        eigenval_q = np.zeros([len(self.eigenvalues), self.nqpoints], dtype = complex) 
+        eigenvec_q = np.zeros([n_excitons, len(self.eigenvectors[0]), self.nqpoints], dtype = complex) 
 
-        omega_q    = self.calculate_omega_finiteq(energies,excitons,self.Qpt,kindx)
+        for iq in range(self.nqpoints):
+
+            yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]                 
+
+            for t in range(len(self.eigenvalues)):
+                eigenval_q[t,iq] = yexc_list.eigenvalues[t]
+
+            for i_exc,exciton in enumerate(excitons):
+    
+                for t in range(len(self.eigenvectors[0])):
+                    eigenvec_q[exciton-1,t,iq] = yexc_list.eigenvectors[exciton-1,t]
+
+        #Gauss_dis = self.Gauss_dist(excitons,omega_1, omega_2, omega_step, sigma)
+
+        rho_q = self.calculate_rho_finiteq(excitons,kindx, eigenvec_q, eigenval_q)
+
+        omega_q    = self.calculate_omega_finiteq(energies,energies_db,excitons,kindx, eigenvec_q, eigenval_q)
 
         ibz_nkpoints = max(lattice.kpoints_indexes)+1
         kpoints = lattice.red_kpoints
@@ -1721,7 +1787,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         rho_max = np.zeros([self.nkpoints, self.nvbands, n_excitons, self.nqpoints])
         omega_max = np.zeros([self.nkpoints, self.nvbands, n_excitons, self.nqpoints])
-
 
         for iq in range(self.nqpoints):
 
@@ -1773,7 +1838,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         distances = calculate_distances(kpoints_path)
         nkpoints_path = kpoints_path.shape[0]
 
-
         na = np.newaxis
         rho_q_path   = np.zeros([1, nkpoints_path, self.nvbands, n_excitons, self.nqpoints])
         omega_q_path = np.zeros([1, nkpoints_path, self.nvbands, n_excitons, self.nqpoints])
@@ -1802,7 +1866,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         import matplotlib.pyplot as plt
 
-        Btz_d = self.Boltz_dist(excitons,100)
+        Btz_d = self.Boltz_dist(excitons, 100, eigenvec_q, eigenval_q)
 
         # I(k,omega_band)
         Intensity_q = np.zeros([n_omegas,nkpoints_path]) 
@@ -1814,6 +1878,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                         for i_v in range(self.nvbands): 
                             delta_q = 1.0/( omega_band[i_o] - omega_q_path[0, i_k, i_v, i_exc, iq] + Im*omega_width ) # check this
                             Intensity_q[i_o,i_k] += 2*np.pi*Btz_d[i_exc,iq]*rho_q_path[0, i_k, i_v, i_exc, iq]*delta_q.imag
+                            #Intensity_q[i_o,i_k] += 2*np.pi*Gauss_dis[i_o,i_exc,iq]*rho_q_path[0, i_k, i_v, i_exc, iq]*delta_q.imag
                             print(i_o,i_k,i_v,i_k,i_exc,iq,Intensity_q[i_o,i_k])
 
         X, Y = np.meshgrid(distances, omega_band)
@@ -1823,12 +1888,19 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         ax.pcolor(X, Y, Intensity_q,cmap=cmap_name,shading='auto')
 
         # Plot Valence Band Energies
-        #for i_b in range(energies_path.shape[2]):
-        for i_b in range(self.nvbands):
-            ax.plot(distances,energies_path[0,:,i_b],lw=1.0,color='white')
-        for i_b in range(self.ncbands):
-            ax.plot(distances,energies_path[0,:,i_b+self.nvbands]+scissor,lw=1.0,color='white')
-            #plt.plot(distances,energies_path[0,:,i_b+9],lw=0.5,color='r')
+        if isinstance(energies_db,(YamboSaveDB,YamboElectronsDB)):
+
+           for i_b in range(self.nvbands):
+               ax.plot(distances,energies_path[0,:,i_b],lw=1.0,color='white')
+           for i_b in range(self.ncbands):
+               ax.plot(distances,energies_path[0,:,i_b+self.nvbands]+scissor,lw=1.0,color='white')
+               #plt.plot(distances,energies_path[0,:,i_b+9],lw=0.5,color='r')
+
+        elif isinstance(energies_db,YamboQPDB):   # Check this works !!!!
+           for i_b in range(self.nvbands):
+               ax.plot(distances,energies_path[0,:,i_b],lw=1.0,color='white')
+           for i_b in range(self.ncbands):
+               ax.plot(distances,energies_path[0,:,i_b+self.nvbands],lw=1.0,color='white')
 
         ax.set_xlim((distances[0],distances[-1]))
         ax.set_ylim((omega_1,omega_2-omega_width))
@@ -1851,7 +1923,16 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         exc_DOS_norm = exc_DOS/np.max(exc_DOS)
 
         bx.plot(exc_DOS_norm,omega_band, color = 'darkblue', lw = 1.5)
-        bx.set_ylim((omega_1,omega_2-omega_width))
+        bx.set_ylim((omega_1,omega_2))
+
+        eDOS_x, eDOS_y, eDOS_Boltz_y = self.exc_DOS(excitons, omega_1, omega_2, omega_step, sigma, eigenvec_q, eigenval_q, Btz_d)
+
+        cx.plot(eDOS_y, eDOS_x-0.4+0.37, color = 'black', lw = 1.5)
+
+        cx.plot(eDOS_Boltz_y, eDOS_x-0.4+0.37, color = 'red', lw = 1.5)
+
+        cx.set_ylim((omega_1,omega_2))
+
         plt.show()
 
         #create band-structure object

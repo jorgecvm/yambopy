@@ -23,7 +23,7 @@ class ProjwfcXML(object):
     """
     _proj_file = 'atomic_proj.xml'
 
-    def __init__(self,prefix,output_filename='projwfc.log',path='.',qe_version='6.1'):
+    def __init__(self,prefix,output_filename='projwfc.log',path='.',qe_version='7.0'):
         """
         Initialize the structure with the path where the atomic_proj.xml is
         The zero energy is fixed at the Fermi energy
@@ -194,7 +194,7 @@ class ProjwfcXML(object):
                w_proj = self.get_weights(selected_orbitals=selected_orbitals)
                for ib in range(bandmin,bandmax):
                    eig = self.eigen[:,ib] + y_offset
-                   cax = ax.scatter(kpoints_dists,eig,s=w_proj[:,ib]*size,c=color,edgecolors='none',alpha=alpha,label=label_1,rasterized=True,zorder=2)
+                   cax = ax.scatter(kpoints_dists,eig + 0.032,s=w_proj[:,ib]*size,c=color,edgecolors='none',alpha=alpha,label=label_1,rasterized=True,zorder=2)
 
             elif self.spin_components == 2:
                  w_proj1, w_proj2 = self.get_weights(selected_orbitals=selected_orbitals)
