@@ -339,7 +339,8 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                 v = kcv[1] - self.unique_vbands[0] - 1
                 c = kcv[2] - self.unique_vbands[0] - 1
                 #k,v,c   = kcv[0:3]-1    # This is bug's source between yambo 4.4 and 5.0
-                k_v,k_c = k, kindx.qindx_X[iq-1,k,0] - 1 - k
+                k_v,k_c = k, kindx.qindx_X[iq-1,k,0] - 1
+                print(k_v,k_c)
                 this_weight = abs2(eivec[t])
                 weights_v[k_v,v] += this_weight
                 weights_c[k_c,c] += this_weight
@@ -421,6 +422,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
  
     def get_exciton_2D_finite_q(self,excitons,iq,kindx,f=None):
         """get data of the exciton in 2D for finite-q"""
+        print(self.Qpt)
         weights_v, weights_c  = self.get_exciton_weights_finiteq(excitons,self.Qpt,kindx) 
 
         #sum all the bands for valence and conduction
@@ -534,7 +536,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         return ax,s
 
  
-    def plot_exciton_2D_ax_finiteq(self,ax,bx,iq,kindx,excitons,f=None,mode='hexagon',limfactor=0.8,spin_pol=None,**kwargs):
+    def plot_exciton_2D_ax_finiteq(self,ax,bx,cx,iq,kindx,excitons,f=None,mode='hexagon',limfactor=0.8,spin_pol=None,**kwargs):
         """
         Plot the exciton weights in a 2D Brillouin zone for finite-q where the plots in valence and conduction are different
        
@@ -555,6 +557,9 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         weights_v_bz_sum=weights_v_bz_sum/np.max(weights_v_bz_sum)
         weights_c_bz_sum=weights_c_bz_sum/np.max(weights_c_bz_sum)
 
+        weights_total_bz_sum = weights_v_bz_sum + weights_c_bz_sum
+        weights_total_bz_sum = weights_total_bz_sum/np.max(weights_total_bz_sum)
+
         #filter points outside of area
         lim = np.max(self.lattice.rlat)*limfactor
         dlim = lim*1.1
@@ -565,20 +570,27 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         filtered_weights_c = [[xi,yi,di] for xi,yi,di in zip(x,y,weights_c_bz_sum) if -dlim<xi and xi<dlim and -dlim<yi and yi<dlim]
         x_c,y_c,weights_c_bz_sum = np.array(filtered_weights_c).T
 
+        filtered_weights_total = [[xi,yi,di] for xi,yi,di in zip(x,y,weights_total_bz_sum) if -dlim<xi and xi<dlim and -dlim<yi and yi<dlim]
+        x_total,y_total,weights_total_bz_sum = np.array(filtered_weights_total).T
+
         # Add contours of BZ
         ax.add_patch(BZ_Wigner_Seitz(self.lattice, color = 'black'))
         bx.add_patch(BZ_Wigner_Seitz(self.lattice, color = 'black'))
+        cx.add_patch(BZ_Wigner_Seitz(self.lattice, color = 'black'))
 
 
         #plotting
         if mode == 'hexagon': 
-            scale = kwargs.pop('scale',1)   
+            scale = kwargs.pop('scale',150)   
             s_v=ax.scatter(x_v,y_v,s=scale,marker='H',c=weights_v_bz_sum,rasterized=True,**kwargs)
             s_c=bx.scatter(x_c,y_c,s=scale,marker='H',c=weights_c_bz_sum,rasterized=True,**kwargs)
+            s_total=cx.scatter(x_total,y_total,s=scale,marker='H',c=weights_c_bz_sum,rasterized=True,**kwargs)
             ax.set_xlim(-lim,lim)
             ax.set_ylim(-lim,lim)
             bx.set_xlim(-lim,lim)
             bx.set_ylim(-lim,lim)
+            cx.set_xlim(-lim,lim)
+            cx.set_ylim(-lim,lim)
 
         elif mode == 'square': 
             scale = kwargs.pop('scale',1)
@@ -605,27 +617,38 @@ class YamboExcitonFiniteQ(YamboSaveDB):
             x_c = y_c = np.linspace(-lim,lim,npts)
             weights_c_bz_sum = np.zeros([npts,npts])
 
+            rbfi_total = Rbf(x_total,y_total,weights_total_bz_sum,function='linear')
+            x_total = y_total = np.linspace(-lim,lim,npts)
+            weights_total_bz_sum = np.zeros([npts,npts])
+
             for col in range(npts): 
                 weights_v_bz_sum[:,col] = rbfi_v(x_v,np.ones_like(x_v)*y_v[col])
                 weights_c_bz_sum[:,col] = rbfi_c(x_c,np.ones_like(x_c)*y_c[col])
+                weights_total_bz_sum[:,col] = rbfi_total(x_total,np.ones_like(x_total)*y_total[col])
                 cmap_v = plt.cm.Blues
                 cmap_c = plt.cm.Reds
+                cmap_total = plt.cm.viridis
                 s_v=ax.imshow(weights_v_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = cmap_v, alpha = 1.0)
-                s_c=ax.imshow(weights_c_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = cmap_c, alpha = 0.5)
-       
-        title = kwargs.pop('title',str(excitons))
+                s_c=bx.imshow(weights_c_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = cmap_c, alpha = 1.0)
+                s_total=cx.imshow(weights_total_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = cmap_total, alpha = 1.0)
 
-        ax.set_title(title)
+
+        ax.set_title('Valence contribution')
         ax.set_aspect('equal')
         ax.set_xticks([])
         ax.set_yticks([])
 
-        bx.set_title(title)
+        bx.set_title('Conduction contribution')
         bx.set_aspect('equal')
         bx.set_xticks([])
         bx.set_yticks([])
 
-        return ax,bx,s_v,s_c
+        cx.set_title('Total contribution')
+        cx.set_aspect('equal')
+        cx.set_xticks([])
+        cx.set_yticks([])
+      
+        return ax,bx,cx,s_v,s_c
     
     def get_exciton_3D(self,excitons,f=None):
         """get data of the exciton in 2D"""

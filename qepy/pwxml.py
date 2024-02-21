@@ -381,8 +381,6 @@ class PwXML():
 
         if spin_proj == True:
            self.spin_projection(spin_dir=3,folder=spin_folder,prefix='bands')
-           print(self.spin_3)
-        exit()
 
         if path_kpoints:
             if isinstance(path_kpoints,Path):
@@ -393,7 +391,7 @@ class PwXML():
         ax.set_ylabel('E (eV)')
 
         # I choose a colormap for spin
-        color_map  = plt.get_cmap('seismic')
+        color_map  = plt.get_cmap('coolwarm')
 
         #get kpoint_dists 
         kpoints_dists = calculate_distances(self.kpoints)
@@ -413,8 +411,8 @@ class PwXML():
         for ib in range(self.nbands):
             x = kpoints_dists
             y = eigen1[:,ib] - self.fermi
-            color_spin = self.spin_proj[:,ib] + 0.5 # I renormalize 0 => down; 1 => up
-            ax.scatter(x,y,s=100,c=color_spin,cmap=color_map,vmin=0.0,vmax=1.0,edgecolors='none')
+            color_spin = self.spin_3[:,ib] + 0.5 # I renormalize 0 => down; 1 => up
+            ax.scatter(x,y + 7.313 + 2.021 - 3.518,s=4,c=color_spin,cmap=color_map,vmin=0.0,vmax=1.0,edgecolors='none')
        
         #plot spin-polarized bands: TO BE DONE
         #if self.lsda:
@@ -519,7 +517,8 @@ class PwXML():
             for ib in range(nline):
                 ib1, ib2, ib3 = int(ib*10), int((ib+1)*10), int(ik*(nband/10+1)+2+ib)
                 self.spin_3[ik,ib1:ib2] = list( map(float,data_spin_3[ib3].split()))
-
+                print(self.spin_3)
+ 
     def read_symmetries(self):
         """
         Read symmetry operations from data-file-schema.xml

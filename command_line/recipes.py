@@ -222,7 +222,7 @@ def merge_qp(output,files):
     Merge the quasiparticle databases produced by yambo
     """
     #read all the files and display main info in each of them
-    filenames = [ f.name for f in files]
+    filenames = [ f for f in files]
     datasets  = [ Dataset(filename) for filename in filenames]
     #call compatibility version if old dataset detected 
     try: 
