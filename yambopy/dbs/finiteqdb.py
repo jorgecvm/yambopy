@@ -9,6 +9,7 @@ from yambopy.dbs.electronsdb import *
 from yambopy.dbs.qpdb import *
 from matplotlib import cm
 import matplotlib.pyplot as plt
+import matplotlib
 
 
 
@@ -1572,8 +1573,8 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                     for total_i_exc in range(len(self.eigenvalues)):
 
                         eDOS[w] += np.exp( -( omega_band[w] - eigenval_q.real[total_i_exc,iq] )**2 / (2 * sigma**2) ) / ( np.sqrt(2 * np.pi) * sigma )
-                        eDOS_Boltz[w] += Btz_d[i_exc,iq] * np.exp( -( omega_band[w] - eigenval_q.real[total_i_exc,iq] )**2 / (2 * sigma**2) ) / ( np.sqrt(2 * np.pi) * sigma )
-                        print(w, total_i_exc, iq, eDOS[w],eDOS_Boltz[w])
+                
+                        eDOS_Boltz[w] += np.exp( -( (omega_band[w] - eigenval_q.real[total_i_exc,iq])*Btz_d[i_exc,iq] )**2 / (2 * sigma**2) ) / ( np.sqrt(2 * np.pi) * sigma )
 
         eDOS_norm = eDOS/np.max(eDOS)
 
@@ -1889,7 +1890,10 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         import matplotlib.pyplot as plt
 
-        Btz_d = self.Boltz_dist(excitons, 100, eigenvec_q, eigenval_q)
+        TempBoltz = 3500
+        label_string = "T = "
+
+        Btz_d = self.Boltz_dist(excitons, TempBoltz, eigenvec_q, eigenval_q)
 
         # I(k,omega_band)
         Intensity_q = np.zeros([n_omegas,nkpoints_path]) 
@@ -1945,16 +1949,58 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         exc_DOS_norm = exc_DOS/np.max(exc_DOS)
 
-        bx.plot(exc_DOS_norm,omega_band, color = 'darkblue', lw = 1.5)
+        bx.plot(exc_DOS_norm,omega_band, color = 'darkblue', lw = 1.5, label = f"{label_string} {TempBoltz}")
         bx.set_ylim((omega_1,omega_2))
+        bx.set_xlim((0.0,1.0))
+        #bx.fill_between(exc_DOS_norm,omega_band, color = 'blue', alpha = 0.3)
 
         eDOS_x, eDOS_y, eDOS_Boltz_y = self.exc_DOS(excitons, omega_1, omega_2, omega_step, sigma, eigenvec_q, eigenval_q, Btz_d)
 
-        cx.plot(eDOS_y, eDOS_x-0.4+0.37, color = 'black', lw = 1.5)
+        cx.plot(eDOS_y, eDOS_x, color = 'black', lw = 1.5)
 
-        cx.plot(eDOS_Boltz_y, eDOS_x-0.4+0.37, color = 'red', lw = 1.5)
+        #cx.plot(eDOS_Boltz_y, eDOS_x, color = 'red', lw = 1.5)
 
         cx.set_ylim((omega_1,omega_2))
+        cx.set_xlim((0.0,0.05))
+
+        ax.spines["bottom"].set_linewidth(1)
+        ax.spines["top"].set_linewidth(1)
+        ax.spines["right"].set_linewidth(1)
+        ax.spines["left"].set_linewidth(1)
+        ax.tick_params(labelsize=14, top = 'on', right = 'on', direction = 'in')
+        ax.tick_params(axis = 'x', pad = 10)
+        ax.tick_params(axis = 'y', pad = 12)
+        ax.yaxis.label.set_size(14)
+        ax.xaxis.label.set_size(14)
+
+        ax.set_ylabel('Energy (eV)')
+
+        bx.spines["bottom"].set_linewidth(1)
+        bx.spines["top"].set_linewidth(1)
+        bx.spines["right"].set_linewidth(1)
+        bx.spines["left"].set_linewidth(1)
+        bx.tick_params(labelsize=14, top = False, right = False, bottom = True, left = False, direction = 'in')
+        bx.tick_params(axis = 'x', pad = 10)
+        bx.tick_params(axis = 'y', pad = 12)
+        bx.yaxis.label.set_size(14)
+        bx.xaxis.label.set_size(14)
+        bx.legend(loc = 'lower right', frameon = False, fontsize = 14)
+        bx.yaxis.set_ticklabels([]) 
+        bx.xaxis.tick_top()
+
+        cx.spines["bottom"].set_linewidth(1)
+        cx.spines["top"].set_linewidth(1)
+        cx.spines["right"].set_linewidth(1)
+        cx.spines["left"].set_linewidth(1)
+        cx.tick_params(labelsize=12, top = 'on', right = 'on', direction = 'in')
+        cx.tick_params(axis = 'x', pad = 5)
+        cx.tick_params(axis = 'y', pad = 10)
+        cx.yaxis.label.set_size(12)
+        cx.xaxis.label.set_size(12)
+
+        ind = (0.0, 0.5, 1.0)
+        bx.xaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
+        bx.set_xticklabels(['0.0','0.5', '1.0'])
 
         plt.show()
 
