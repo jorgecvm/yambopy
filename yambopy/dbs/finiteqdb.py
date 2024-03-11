@@ -1531,26 +1531,27 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         return Btz_d
 
-    def Gauss_dist(self, excitons, omega_1, omega_2, omega_step, sigma):
+    def Gauss_dist(self, excitons, omega_1, omega_2, omega_step, sigma, eigenval_q, iq_fixed):
 
         n_excitons = len(excitons)
 
-        eigenvec_q, eigenval_q = self.alldata(excitons,self.nqpoints)
-
         omega_band  = np.arange(omega_1,omega_2,omega_step)
 
-        Gauss_dis = np.zeros([len(omega_band), n_excitons, self.nqpoints])
+        Gauss_dis = np.zeros([len(omega_band),self.nqpoints])
 
-        for w in range(len(omega_band)):
-          
+        for i_exc, exciton in enumerate(excitons):
+
             for iq in range(self.nqpoints):
 
-                   for i_exc, exciton in enumerate(excitons):
+                for w in range(len(omega_band)):
 
-                    Gauss_dis[w,i_exc,iq] += np.exp( -( omega_band[w] - eigenval_q.real[i_exc,iq] )**2 / (2 * sigma**2) ) / ( np.sqrt(2 * np.pi) * sigma )
-                    print(w, i_exc, iq, Gauss_dis[w,i_exc,iq])
+                    if iq == iq_fixed - 1:
 
-        Gauss_dis = Gauss_dis/np.amax(Gauss_dis)
+                       Gauss_dis[w,iq] = ( (1.0) / (sigma * np.sqrt(2.0 * np.pi)) )*( np.exp( (-0.5)*( ( (omega_band[w] - eigenval_q.real[exciton-1,iq_fixed-1])/(sigma) )**2 ) ) ) 
+
+                    else:
+
+                       Gauss_dis[w,iq] = 0.0
 
         return Gauss_dis
 
@@ -1728,7 +1729,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         return 
 
 
-    def arpes_intensity_interpolated_finiteq(self,energies_db,kindx,path,excitons,ax,bx,cx,lpratio=5,f=None,size=1,verbose=True,**kwargs):
+    def arpes_intensity_interpolated_finiteq(self,energies_db,kindx,path,excitons,ax,bx,cx,T,lpratio=5,f=None,size=1,verbose=True,**kwargs):
         
         """ 
             Interpolate arpes bandstructure using SKW interpolation from Abipy (version 1)
@@ -1783,9 +1784,14 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         eigenval_q = np.zeros([len(self.eigenvalues), self.nqpoints], dtype = complex) 
         eigenvec_q = np.zeros([n_excitons, len(self.eigenvectors[0]), self.nqpoints], dtype = complex) 
 
+    
+
         for iq in range(self.nqpoints):
 
-            yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]                 
+            yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]     
+                   # Hay un error ya que la dimensión de eigenvec_q y exciton coinciden para state = 1, pero si pones 2 que sean [2,3]
+                   # ya no, ya que la dimensión sigue siendo 2 pero yambopy le da al programa valores > 2 entonces peta.             
+            print(yexc_list)
 
             for t in range(len(self.eigenvalues)):
                 eigenval_q[t,iq] = yexc_list.eigenvalues[t]
@@ -1890,23 +1896,42 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         import matplotlib.pyplot as plt
 
-        TempBoltz = 3500
-        label_string = "T = "
-
-        Btz_d = self.Boltz_dist(excitons, TempBoltz, eigenvec_q, eigenval_q)
-
         # I(k,omega_band)
         Intensity_q = np.zeros([n_omegas,nkpoints_path]) 
-        
-        for iq in range(self.nqpoints):
-            for i_exc in range(n_excitons):
-                for i_o in range(n_omegas):
-                    for i_k in range(nkpoints_path):
-                        for i_v in range(self.nvbands): 
-                            delta_q = 1.0/( omega_band[i_o] - omega_q_path[0, i_k, i_v, i_exc, iq] + Im*omega_width ) # check this
-                            Intensity_q[i_o,i_k] += 2*np.pi*Btz_d[i_exc,iq]*rho_q_path[0, i_k, i_v, i_exc, iq]*delta_q.imag
-                            #Intensity_q[i_o,i_k] += 2*np.pi*Gauss_dis[i_o,i_exc,iq]*rho_q_path[0, i_k, i_v, i_exc, iq]*delta_q.imag
-                            print(i_o,i_k,i_v,i_k,i_exc,iq,Intensity_q[i_o,i_k])
+
+        if T < 100:
+
+           sigma_Gauss = T/300
+           label_string_1 = "Temperature = "
+           label_string_2 = "Sigma = "
+           print(f"{label_string_1} {T} | {label_string_2} {sigma_Gauss}")
+           Gauss_dis = self.Gauss_dist(excitons, omega_1, omega_2, omega_step, sigma_Gauss, eigenval_q, self.Qpt)
+
+           for iq in range(self.nqpoints):
+               for i_exc in range(n_excitons):
+                   for i_o in range(n_omegas):
+                       for i_k in range(nkpoints_path):
+                           for i_v in range(self.nvbands): 
+                               delta_q = 1.0/( omega_band[i_o] - omega_q_path[0, i_k, i_v, i_exc, iq] + Im*omega_width ) # check this
+                               Intensity_q[i_o,i_k] += 2*np.pi*Gauss_dis[i_o,iq]*rho_q_path[0, i_k, i_v, i_exc, iq]*delta_q.imag
+                               print(i_o,i_k,i_v,i_k,i_exc,iq,Intensity_q[i_o,i_k])
+
+        else:
+
+           sigma_Gauss = T/300
+           label_string_1 = "Temperature = "
+           label_string_2 = "Sigma = "
+           print(f"{label_string_1} {T} | {label_string_2} {sigma_Gauss}")
+           Btz_d = self.Boltz_dist(excitons, T, eigenvec_q, eigenval_q)
+
+           for iq in range(self.nqpoints):
+               for i_exc in range(n_excitons):
+                   for i_o in range(n_omegas):
+                       for i_k in range(nkpoints_path):
+                           for i_v in range(self.nvbands): 
+                               delta_q = 1.0/( omega_band[i_o] - omega_q_path[0, i_k, i_v, i_exc, iq] + Im*omega_width ) # check this
+                               Intensity_q[i_o,i_k] += 2*np.pi*Btz_d[i_exc,iq]*rho_q_path[0, i_k, i_v, i_exc, iq]*delta_q.imag
+                               print(i_o,i_k,i_v,i_k,i_exc,iq,Intensity_q[i_o,i_k])
 
         X, Y = np.meshgrid(distances, omega_band)
         import matplotlib.pyplot as plt
@@ -1949,14 +1974,14 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         exc_DOS_norm = exc_DOS/np.max(exc_DOS)
 
-        bx.plot(exc_DOS_norm,omega_band, color = 'darkblue', lw = 1.5, label = f"{label_string} {TempBoltz}")
+        bx.plot(exc_DOS_norm,omega_band, color = 'darkblue', lw = 1.5, label = f"T = {T}")
         bx.set_ylim((omega_1,omega_2))
         bx.set_xlim((0.0,1.0))
         #bx.fill_between(exc_DOS_norm,omega_band, color = 'blue', alpha = 0.3)
 
-        eDOS_x, eDOS_y, eDOS_Boltz_y = self.exc_DOS(excitons, omega_1, omega_2, omega_step, sigma, eigenvec_q, eigenval_q, Btz_d)
+        #eDOS_x, eDOS_y, eDOS_Boltz_y = self.exc_DOS(excitons, omega_1, omega_2, omega_step, sigma, eigenvec_q, eigenval_q, Btz_d)
 
-        cx.plot(eDOS_y, eDOS_x, color = 'black', lw = 1.5)
+        #cx.plot(eDOS_y, eDOS_x, color = 'black', lw = 1.5)
 
         #cx.plot(eDOS_Boltz_y, eDOS_x, color = 'red', lw = 1.5)
 
