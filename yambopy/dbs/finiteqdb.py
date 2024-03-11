@@ -1497,7 +1497,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                 for t,kvc in enumerate(self.table):
                     k,v,c = kvc[0:3]-1    
                     i_v = v - self.unique_vbands[0] 
-                    rho_q[k,i_v,i_exc,iq] += abs2(eigenvec_q[exciton-1,t,iq])
+                    rho_q[k,i_v,i_exc,iq] += abs2(eigenvec_q[i_exc,t,iq])
 
         return rho_q
 
@@ -1784,22 +1784,19 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         eigenval_q = np.zeros([len(self.eigenvalues), self.nqpoints], dtype = complex) 
         eigenvec_q = np.zeros([n_excitons, len(self.eigenvectors[0]), self.nqpoints], dtype = complex) 
 
-    
-
         for iq in range(self.nqpoints):
 
             yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]     
                    # Hay un error ya que la dimensión de eigenvec_q y exciton coinciden para state = 1, pero si pones 2 que sean [2,3]
                    # ya no, ya que la dimensión sigue siendo 2 pero yambopy le da al programa valores > 2 entonces peta.             
-            print(yexc_list)
 
             for t in range(len(self.eigenvalues)):
                 eigenval_q[t,iq] = yexc_list.eigenvalues[t]
 
             for i_exc,exciton in enumerate(excitons):
-    
+                print(i_exc)
                 for t in range(len(self.eigenvectors[0])):
-                    eigenvec_q[exciton-1,t,iq] = yexc_list.eigenvectors[exciton-1,t]
+                    eigenvec_q[i_exc,t,iq] = yexc_list.eigenvectors[exciton-1,t]
 
         #Gauss_dis = self.Gauss_dist(excitons,omega_1, omega_2, omega_step, sigma)
 
