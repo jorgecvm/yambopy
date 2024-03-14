@@ -1521,17 +1521,27 @@ class YamboExcitonFiniteQ(YamboSaveDB):
             for iq in range(self.nqpoints):
                 for total_i_exc in range(len(self.eigenvalues)):
                     sum_den[i_exc] += np.exp( - (eigenval_q.real[total_i_exc,iq]) / (k*T) )
-        print(sum_den[i_exc])
+            print(sum_den[i_exc])
 
         for i_exc, exciton in enumerate(excitons):
             for iq in range(self.nqpoints):
-                Btz_d[i_exc,iq] = ( ( np.exp( - (eigenval_q.real[exciton-1,iq]) / (k*T) ) ) / ( sum_den[i_exc] ) )
+
+                    if eigenval_q.real[exciton-1,iq] <= eigenval_q.real[exciton-1,0]:
+
+                       #Btz_d[i_exc,iq] = ( ( np.exp( - (eigenval_q.real[exciton-1,iq]) / (k*T) ) ) / ( sum_den[i_exc] ) )
+                       Btz_d[i_exc,iq] = ( sum_den[i_exc] )  / ( np.exp( - (eigenval_q.real[exciton-1,iq]) / (k*T) ) )
+ 
+                    else:
+        
+                       Btz_d[i_exc,iq] = 0.0
+
+        Btz_d = Btz_d/np.amax(Btz_d)
 
         print(Btz_d)
 
         return Btz_d
 
-    def Gauss_dist(self, excitons, omega_1, omega_2, omega_step, sigma, eigenval_q, iq_fixed):
+    def Gauss_dist(self, excitons, omega_1, omega_2, omega_step, sigma, eigenval_q, iq_fixed,T):
 
         n_excitons = len(excitons)
 
@@ -1547,11 +1557,13 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
                     if iq == iq_fixed - 1:
 
-                       Gauss_dis[w,iq] = ( (1.0) / (sigma * np.sqrt(2.0 * np.pi)) )*( np.exp( (-0.5)*( ( (omega_band[w] - eigenval_q.real[exciton-1,iq_fixed-1])/(sigma) )**2 ) ) ) 
+                       Gauss_dis[w,iq] = ( (1.0) / (sigma * np.sqrt(2.0 * np.pi)) )*( np.exp( (-0.5)*( ( (omega_band[w] - eigenval_q.real[exciton-1,iq_fixed-1])/(sigma) )**2 ) ) )
 
                     else:
 
                        Gauss_dis[w,iq] = 0.0
+
+        Gauss_dis = Gauss_dis/np.amax(Gauss_dis)
 
         return Gauss_dis
 
@@ -1902,7 +1914,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
            label_string_1 = "Temperature = "
            label_string_2 = "Sigma = "
            print(f"{label_string_1} {T} | {label_string_2} {sigma_Gauss}")
-           Gauss_dis = self.Gauss_dist(excitons, omega_1, omega_2, omega_step, sigma_Gauss, eigenval_q, self.Qpt)
+           Gauss_dis = self.Gauss_dist(excitons, omega_1, omega_2, omega_step, sigma_Gauss, eigenval_q, self.Qpt, T)
 
            for iq in range(self.nqpoints):
                for i_exc in range(n_excitons):
@@ -2023,8 +2035,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         ind = (0.0, 0.5, 1.0)
         bx.xaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
         bx.set_xticklabels(['0.0','0.5', '1.0'])
-
-        plt.show()
 
         #create band-structure object
         #exc_bands = YambopyBandStructure(energies[0],kpoints_path,kpath=path,weights=exc_weights[0],size=size,**kwargs)
