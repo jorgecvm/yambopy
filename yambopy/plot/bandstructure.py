@@ -215,7 +215,7 @@ class YambopyBandStructure():
         ax.axvline(distance,c='k',ls='-',lw=0.0)
         self.kpath.set_xticks(ax)
 
-    def plot_ax(self,ax,xlim=None,ylim=None,size=1.,ylabel='$\epsilon_{n\mathbf{k}}$ [eV]', alpha_weights=0.5,legend=False,**kwargs):
+    def plot_ax(self,ax,xlim=None,ylim=None,size=1.,ylabel='$\epsilon_{n\mathbf{k}}$ [eV]', alpha_weights=0.5,legend=False, **kwargs):
         """Receive an intance of matplotlib axes and add the plot"""
         import matplotlib.pyplot as plt
         kwargs = self.get_kwargs(**kwargs)
@@ -226,7 +226,9 @@ class YambopyBandStructure():
         c_weights = kwargs.pop('c_weights',None)
         c_label   = kwargs.pop('c_label',None)
         lw_label  = kwargs.pop('lw_label',None)
-        linestyle  = kwargs.pop('linestyle',None)
+        linestyle = kwargs.pop('linestyle',None)
+        dashes = kwargs.pop('dashes',None)    
+    
 
         # Add option to plot lines or dots
         #linetype
@@ -236,7 +238,10 @@ class YambopyBandStructure():
         for ib,band in enumerate(self.bands.T):
             x = self.distances
             y = band-fermie
-            ax.plot(x,y,c=c_bands,lw=lw_label,label=c_label, alpha = 0.6, linestyle = linestyle)
+            if dashes is None:
+               ax.plot(x,y,c=c_bands,lw=lw_label,label=c_label, alpha = 0.6)
+            if dashes is not None:
+               ax.plot(x,y,c=c_bands,lw=lw_label,label=c_label, linestyle = linestyle, dashes = dashes, alpha = 0.6)
             # fill between 
             if self.weights is not None: # and self.spin_proj is not None:
                 dy = self.weights[:,ib]*size

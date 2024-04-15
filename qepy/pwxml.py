@@ -9,6 +9,7 @@ from .lattice import *
 from yambopy.plot.plotting import add_fig_kwargs 
 from re import findall
 from numpy import zeros
+from qepy import *
 
 __all__ = ['PwXML']
 
@@ -258,7 +259,7 @@ class PwXML():
         for k in range(self.nkpoints):
             eigen = [float(x) for x in kstates[k].findall('eigenvalues')[0].text.strip().split()]
             self.eigen1.append( eigen )
-        self.eigen1 = np.array(self.eigen1)*HatoeV - self.fermi
+        self.eigen1 = np.array(self.eigen1)*HatoeV
  
         #get Bravais lattice
         self.ibrav = self.datafile_xml.findall("output/atomic_structure")[0].get('bravais_index')
@@ -310,6 +311,16 @@ class PwXML():
         app("nkpoints: %d"%self.nkpoints)
         app("nbands:   %d"%self.nbands)
         return "\n".join(lines)
+
+    def EigenAndKpath(self):
+
+        Eigenvalues = self.eigen1
+
+        Bands = self.nbands
+
+        Distance = lattice.calculate_distances_2D(self.kpoints)
+
+        return Distance, Eigenvalues, Bands
 
     def plot_eigen_ax(self,ax,path_kpoints=[],xlim=(),ylim=(),color='r',**kwargs):
         #

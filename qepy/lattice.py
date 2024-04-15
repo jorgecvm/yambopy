@@ -18,6 +18,19 @@ def calculate_distances(kpoints):
         distances.append(distance)   
     return distances
 
+def calculate_distances_2D(kpoints):
+    """
+    take a list of k-points and calculate the distances between all of them
+    """
+    kpoints = np.array(kpoints)
+    kpoints_2D = np.delete(kpoints,2,1)
+    distances_2D = [0]
+    distance_2D = 0
+    for nk in range(1,len(kpoints_2D)):
+        distance_2D += np.linalg.norm(kpoints_2D[nk-1]-kpoints_2D[nk])
+        distances_2D.append(distance_2D)
+    return distances_2D
+
 class Path(object):
     """ Class that defines a path in the brillouin zone
     """
