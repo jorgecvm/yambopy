@@ -360,6 +360,7 @@ class YamboQPDB():
                skw = SkwInterpolator(lpratio,kpoints,eigens,fermie,nelect,cell,symrel,time_rev,verbose=verbose)
                #kpoints_path = path.get_klist()[:,:3]
                qp_eigens_kpath = skw.interp_kpts(kpoints_path).eigens[0]
+               print(kpoints_path)
                if valence: kwargs['fermie'] = np.max(qp_eigens_kpath[:,:valence])
 
                qp_ebands = YambopyBandStructure(qp_eigens_kpath + 1.13,kpoints_path,kpath=path,**kwargs)
