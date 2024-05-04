@@ -1507,7 +1507,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         w_0 = Pump_energy - (Exc_dif*Time)/(100)
 
-        if Time < 6:
+        if Time < 5:
 
            for iq in range(self.nqpoints):
 
@@ -1526,7 +1526,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                           Gauss_dis[w,i_exc,iq] = 0.0
 
    
-        if Time > 6:
+        if Time >= 5:
 
            for iq in range(self.nqpoints):
 
@@ -1563,6 +1563,10 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                    for w in range(len(omega_band)):
 
                        GBdist[w,i_exc,iq] = Gauss_dis[w,i_exc,iq] 
+                       if GBdist[w,i_exc,iq] < 1e-2:
+                          GBdist[w,i_exc,iq] = 0.0
+
+                       print(GBdist[w,i_exc,iq])
 
         if Time >= 5 and Time < 100:
 
@@ -1578,10 +1582,12 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
                        print(w, i_exc, iq, Gauss_dis[w,i_exc,iq], Btz_d[i_exc,iq], GBdist[w,i_exc,iq])
 
-                       if GBdist[w,i_exc,iq] < 1e-1:
+                       if GBdist[w,i_exc,iq] < 1e-2:
                           GBdist[w,i_exc,iq] = 0.0
 
-        if Time > 100:
+                       print(GBdist[w,i_exc,iq])
+
+        if Time >= 100:
 
            for iq in range(self.nqpoints):
 
@@ -1590,6 +1596,12 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                    for w in range(len(omega_band)):
 
                        GBdist[w,i_exc,iq] = Btz_d[i_exc,iq]
+
+                       if GBdist[w,i_exc,iq] < 1e-2:
+                          GBdist[w,i_exc,iq] = 0.0
+
+        print(np.max(Gauss_dis[:,:,0]), np.max(Gauss_dis[:,:,1]), np.max(Gauss_dis[:,:,2]), np.max(Gauss_dis[:,:,3]), np.max(Gauss_dis[:,:,4]), np.max(Gauss_dis[:,:,5]), np.max(Gauss_dis[:,:,6]))
+
 
         return GBdist
 
@@ -1746,7 +1758,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         Intensity_q = np.zeros([n_omegas,nkpoints_path]) 
 
         sigma_omega = Time/300
-        sigma_momentum = Time/300
+        sigma_momentum = Time/20
         label_string_1 = "Time = "
         label_string_2 = "Sigma_w = "
         label_string_3 = "Sigma_q = "
@@ -1869,7 +1881,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
            dx.set_xlim((0.0,np.amax(eDOS_y)))
 
         else:
-           dx.set_xlim((0.0,np.amax(ExcitonDOS)))
+           dx.set_xlim((0.0,np.amax(eDOS_y)))
 
         ax.spines["bottom"].set_linewidth(1)
         ax.spines["top"].set_linewidth(1)
@@ -1920,7 +1932,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         TempInset = 10000*np.exp(-(Time_dis_T)/50)
 
-        x_values = np.linspace(-50, 50, 10000)
+        x_values = np.linspace(-50, 50, 100)
 
         def sigmoid(x):
             return 1 / (1 + np.exp(-x))
@@ -1936,7 +1948,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         cx2 = cx.twinx()
         cx2.set_xlim(0.0,250.0)
-        cx2.set_ylim(0.02,0.98)
+        cx2.set_ylim(0.00,1.00)
 
         cx2.plot(x_values + 50,Alpha_dis, color = 'magenta', lw = 2, label = 'Alpha (t)')
 
@@ -1961,7 +1973,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         cx.text(110,7500,f"{PumpEnergyPerc_time} {w_0_Perc:.3f} {'eV'}")
         cx.text(110,7000,f"{Time_perc} {Time}")
         cx.set_xlabel('Time')
-        cx2.set_ylabel('Temperature (t)', rotation = 270, fontsize = 12)
+        cx2.set_ylabel('Temperature', rotation = 270, fontsize = 12)
         cx2.spines["bottom"].set_linewidth(1)
         cx2.spines["top"].set_linewidth(1)
         cx2.spines["right"].set_linewidth(1)
