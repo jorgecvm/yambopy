@@ -1486,12 +1486,12 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         for iq in range(self.nqpoints):
             for i_exc in range(Nexcitons):
                 sum_den += np.exp( - (eigenval_q.real[i_exc,iq]) / (k*Temp) )
+                print(sum_den)
 
         for iq in range(self.nqpoints):
             for i_exc in range(Nexcitons):
                 Btz_d[i_exc,iq] = ( ( np.exp( - (eigenval_q.real[i_exc,iq]) / (k*Temp) ) ) / ( sum_den ) )
-
-        Btz_d = Btz_d/np.amax(Btz_d)
+                print(Btz_d[i_exc,iq])
 
         print(Btz_d)
 
@@ -1518,14 +1518,15 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                        if iq == 0:
 
                           Gauss_dis[w,i_exc,iq] = ( (1.0) / (sigma_omega * sigma_omega * sigma_momentum * np.sqrt(2.0 * np.pi)) )*( np.exp( (-0.5)*( ( (eigenval_q.real[i_exc,iq] - w_0)/(sigma_omega) )**2 ) ) ) * ( np.exp( (-0.5)*( ( (iq)/(sigma_momentum) )**2 ) ) )*( np.exp( (-0.5)*( ( (omega_band[w] - w_0)/(sigma_omega) )**2 ) ) )
+                          print(Gauss_dis[w,i_exc,iq])
+    
 
                        else:
 
                           Gauss_dis[w,i_exc,iq] = 0.0
 
-                       print(Gauss_dis[w,i_exc,iq])
-
-        else:
+   
+        if Time > 6:
 
            for iq in range(self.nqpoints):
 
@@ -1534,8 +1535,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                    for w in range(len(omega_band)):
 
                           Gauss_dis[w,i_exc,iq] = ( (1.0) / (sigma_omega * sigma_omega * sigma_momentum * np.sqrt(2.0 * np.pi)) )*( np.exp( (-0.5)*( ( (eigenval_q.real[i_exc,iq] - w_0)/(sigma_omega) )**2 ) ) ) * ( np.exp( (-0.5)*( ( (iq)/(sigma_momentum) )**2 ) ) )*( np.exp( (-0.5)*( ( (omega_band[w] - w_0)/(sigma_omega) )**2 ) ) )
-
-        Gauss_dis = Gauss_dis/np.amax(Gauss_dis)
 
         return Gauss_dis
 
@@ -1550,7 +1549,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         def sigmoid(x):
             return 1 / (1 + np.exp(-x))
 
-        def smooth_step_function(x, threshold=0, slope=0.35):
+        def smooth_step_function(x, threshold=0, slope=0.10):
             return sigmoid(slope * (x - threshold))
 
         Alpha = smooth_step_function(x_values)
@@ -1563,10 +1562,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
                    for w in range(len(omega_band)):
 
-                       GBdist[w,i_exc,iq] = Gauss_dis[w,i_exc,iq]      
-                       print(GBdist[w,i_exc,iq])    
-
-        
+                       GBdist[w,i_exc,iq] = Gauss_dis[w,i_exc,iq] 
 
         if Time >= 5 and Time < 100:
 
@@ -1581,6 +1577,9 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                        #GBdist[w,i_exc,iq] = np.cos(Time*(np.pi/200))**2*Gauss_dis[w,i_exc,iq] + (1.0 - np.cos(Time*(np.pi/200))**2)*Btz_d[i_exc,iq]
 
                        print(w, i_exc, iq, Gauss_dis[w,i_exc,iq], Btz_d[i_exc,iq], GBdist[w,i_exc,iq])
+
+                       if GBdist[w,i_exc,iq] < 1e-1:
+                          GBdist[w,i_exc,iq] = 0.0
 
         if Time > 100:
 
@@ -1613,7 +1612,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         return omega_band, eDOS_norm  
 
 
-    def arpes_intensity_interpolated_finiteq(self,energies_db,kindx,path,ax,bx,cx,Time,Pump_energy,Nexcitons,lpratio=5,f=None,size=1,verbose=True,**kwargs):
+    def arpes_intensity_interpolated_finiteq(self,energies_db,kindx,path,ax,cx,dx,Time,Pump_energy,Nexcitons,lpratio=5,f=None,size=1,verbose=True,**kwargs):
         
         """ 
             Interpolate arpes bandstructure using SKW interpolation from Abipy (version 1)
@@ -1802,7 +1801,13 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         import matplotlib.pyplot as plt
 
         # Plot I(k,w)
-        ax.pcolor(X, Y, Intensity_q, vmin = np.amin(Intensity_q), vmax = np.amax(Intensity_q), cmap=cmap_name, shading='auto')
+        if np.amax(Intensity_q) == 0:
+           ax.pcolor(X, Y, Intensity_q, vmin = 0.0, vmax = 1.0, cmap='magma', shading='auto')
+
+        else:
+           ax.pcolor(X, Y, Intensity_q, vmin = np.amin(Intensity_q), vmax = np.amax(Intensity_q), cmap=cmap_name, shading = 'auto')
+
+        print(np.amax(Intensity_q))
 
         # Plot Valence Band Energies
         if isinstance(energies_db,(YamboSaveDB,YamboElectronsDB)):
@@ -1837,25 +1842,34 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         exc_DOS = -exc_DOS
 
-        exc_DOS_norm = exc_DOS/np.amax(exc_DOS)
+        if np.amax(exc_DOS) == 0:
+           exc_DOS_norm = exc_DOS
 
-        bx.plot(exc_DOS_norm,omega_band, color = 'darkblue', lw = 1.5, label = f"Time = {Time}")
-        bx.set_ylim((omega_1,omega_2))
-        bx.set_xlim((0.0,1.0))
+        else:
+           exc_DOS_norm = exc_DOS/np.amax(exc_DOS)
+
+        #bx.plot(exc_DOS_norm,omega_band, color = 'darkblue', lw = 1.5, label = f"Time = {Time}")
+        #bx.set_ylim((omega_1,omega_2))
+        #bx.set_xlim((0.0,1.0))
         #bx.fill_between(exc_DOS_norm,omega_band, color = 'blue', alpha = 0.3)
 
         eDOS_x, eDOS_y = self.exc_DOS(omega_1, omega_2, omega_step, sigma, eigenvec_q, eigenval_q, GBdis, Nexcitons)
 
         ExcitonDOS = eDOS_y*exc_DOS_norm
 
-        cx.plot(eDOS_y, eDOS_x, color = 'black', lw = 1.5, label = 'Exciton density')
+        dx.plot(eDOS_y, eDOS_x, color = 'black', lw = 1.5, label = 'Exciton density')
 
-        cx.plot(ExcitonDOS, eDOS_x, color = 'red', lw = 1.5, label = 'Occupied excitons')
+        dx.plot(ExcitonDOS, eDOS_x, color = 'red', lw = 1.5, label = 'Occupied excitons')
 
-        cx.legend(loc = 'lower right', frameon = False, fontsize = 10)
+        dx.legend(loc = 'lower right', frameon = False, fontsize = 10)
 
-        cx.set_ylim((omega_1,omega_2))
-        cx.set_xlim((0.0,0.05))
+        dx.set_ylim((omega_1,omega_2))
+
+        if np.max(ExcitonDOS) == 0:
+           dx.set_xlim((0.0,np.amax(eDOS_y)))
+
+        else:
+           dx.set_xlim((0.0,np.amax(ExcitonDOS)))
 
         ax.spines["bottom"].set_linewidth(1)
         ax.spines["top"].set_linewidth(1)
@@ -1869,19 +1883,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         ax.set_ylabel('Energy (eV)')
 
-        bx.spines["bottom"].set_linewidth(1)
-        bx.spines["top"].set_linewidth(1)
-        bx.spines["right"].set_linewidth(1)
-        bx.spines["left"].set_linewidth(1)
-        bx.tick_params(labelsize=14, top = False, right = False, bottom = True, left = False, direction = 'in')
-        bx.tick_params(axis = 'x', pad = 10)
-        bx.tick_params(axis = 'y', pad = 12)
-        bx.yaxis.label.set_size(14)
-        bx.xaxis.label.set_size(14)
-        bx.legend(loc = 'lower right', frameon = False, fontsize = 10)
-        bx.yaxis.set_ticklabels([]) 
-        bx.xaxis.tick_top()
-
         cx.spines["bottom"].set_linewidth(1)
         cx.spines["top"].set_linewidth(1)
         cx.spines["right"].set_linewidth(1)
@@ -1892,14 +1893,90 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         cx.yaxis.label.set_size(12)
         cx.xaxis.label.set_size(12)
         cx.yaxis.set_ticklabels([]) 
+        cx.yaxis.set_ticklabels([]) 
+        #cx.xaxis.tick_top()
 
-        ind = (0.0, 0.5, 1.0)
-        bx.xaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
-        bx.set_xticklabels(['0.0','0.5', '1.0'])
-
-        #plt.savefig('TR-ARPES.png')
+        #ind = (0.0, 0.5, 1.0)
+        #bx.xaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
+        #bx.set_xticklabels(['0.0','0.5', '1.0'])
 
         
+        dx.spines["bottom"].set_linewidth(1)
+        dx.spines["top"].set_linewidth(1)
+        dx.spines["right"].set_linewidth(1)
+        dx.spines["left"].set_linewidth(1)
+        dx.tick_params(labelsize=14, top = False, right = False, bottom = True, left = False, direction = 'in')
+        dx.tick_params(axis = 'x', pad = 10)
+        dx.tick_params(axis = 'y', pad = 12)
+        dx.yaxis.label.set_size(14)
+        dx.xaxis.label.set_size(14)
+
+        dx.legend(loc = 'lower right', frameon = False, fontsize = 8)
+        dx.yaxis.set_ticklabels([]) 
+        dx.xaxis.set_ticklabels([]) 
+        #dx.xaxis.tick_top()
+        
+        Time_dis_T = np.linspace(0, 250, 10000)
+
+        TempInset = 10000*np.exp(-(Time_dis_T)/50)
+
+        x_values = np.linspace(-50, 50, 10000)
+
+        def sigmoid(x):
+            return 1 / (1 + np.exp(-x))
+
+        def smooth_step_function(x, threshold=0, slope=0.10):
+            return sigmoid(slope * (x - threshold))
+
+        Alpha_dis = smooth_step_function(x_values)
+
+        cx.plot(Time_dis_T,TempInset, color = 'darkorange', lw = 2, label = 'T(t)')
+
+        cx.legend(loc = (0.53,0.95), frameon = False)
+
+        cx2 = cx.twinx()
+        cx2.set_xlim(0.0,250.0)
+        cx2.set_ylim(0.02,0.98)
+
+        cx2.plot(x_values + 50,Alpha_dis, color = 'magenta', lw = 2, label = 'Alpha (t)')
+
+
+        cx2.axvline(x = Time, linestyle = 'dashed', lw = 1, color = 'black')
+        cx2.legend(loc = (0.53,0.90), frameon = False)
+
+        GaussianPerc = '% Gaussian'
+        BoltzmannPerc = '% Boltzmann'
+        PumpEnergyPerc = '$\omega_{0}$ = '
+        PumpEnergyPerc_time = '$\omega$(t) = '
+        Time_perc = 'Time = '
+
+
+        Exc_dif_Perc = Pump_energy - np.min(eigenval_q.real[0,:])
+
+        w_0_Perc = Pump_energy - (Exc_dif_Perc*Time)/(100)
+
+        cx.text(110,9000,f"{1-Alpha_dis[Time]:.3f} {GaussianPerc}")
+        cx.text(110,8500,f"{Alpha_dis[Time]:.3f} {BoltzmannPerc}")
+        cx.text(110,8000,f"{PumpEnergyPerc} {Pump_energy:.3f} {'eV'}")
+        cx.text(110,7500,f"{PumpEnergyPerc_time} {w_0_Perc:.3f} {'eV'}")
+        cx.text(110,7000,f"{Time_perc} {Time}")
+        cx.set_xlabel('Time')
+        cx2.set_ylabel('Temperature (t)', rotation = 270, fontsize = 12)
+        cx2.spines["bottom"].set_linewidth(1)
+        cx2.spines["top"].set_linewidth(1)
+        cx2.spines["right"].set_linewidth(1)
+        cx2.spines["left"].set_linewidth(1)
+        cx2.tick_params(labelsize=12, top = 'on', right = 'on', direction = 'in')
+        cx2.tick_params(axis = 'x', pad = 5)
+        cx2.tick_params(axis = 'y', pad = 10)
+        cx2.yaxis.label.set_size(12)
+        cx2.xaxis.label.set_size(12)
+ 
+        ind = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
+        cx2.yaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
+        cx2.set_yticklabels(['0', '2000', '4000', '6000', '8000', '10000'])
+
+        '''
         fig2 = plt.figure(figsize=(9,9))
         dx  = fig2.add_axes( [ 0.15, 0.10, 0.700, 0.85 ])
         ex  = fig2.add_axes( [ 0.375, 0.40, 0.375, 0.35 ])
@@ -2003,7 +2080,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         dx.text(300,0.03,f"{InitialEnergy} {InitialExcValue}", color = 'black', fontsize = 12)
 
         plt.savefig('Distribution.png')
-        
+        '''
         return 
 
 

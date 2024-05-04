@@ -172,9 +172,9 @@ class ProjwfcXML(object):
               for ib in range(bandmin,bandmax):
                   eig = self.eigen[:,ib] + y_offset
                   if size_projection==True:
-                     cax = ax.scatter(kpoints_dists,eig,s=size[:,ib],c=w_rel[:,ib],cmap=color_map,vmin=0,vmax=1,edgecolors='none',label=label_1,rasterized=True,zorder=2)
+                     cax = ax.scatter(kpoints_dists,eig - 0.05,s=size[:,ib],c=w_rel[:,ib],cmap=color_map,vmin=0,vmax=1,edgecolors='none',label=label_1,rasterized=True,zorder=2)
                   else:
-                     cax = ax.scatter(kpoints_dists,eig + 0.64,s=size,c=w_rel[:,ib],cmap=color_map,vmin=0,vmax=1,edgecolors='none',label=label_1,rasterized=True,zorder=2)
+                     cax = ax.scatter(kpoints_dists,eig + 0.0,s=size,c=w_rel[:,ib],cmap=color_map,vmin=0,vmax=1,edgecolors='none',label=label_1,rasterized=True,zorder=2)
 
            # Spin polarized no SOC
            if self.spin_components == 2:
@@ -194,7 +194,7 @@ class ProjwfcXML(object):
                w_proj = self.get_weights(selected_orbitals=selected_orbitals)
                for ib in range(bandmin,bandmax):
                    eig = self.eigen[:,ib] + y_offset
-                   cax = ax.scatter(kpoints_dists,eig + 0.032,s=w_proj[:,ib]*size,c=color,edgecolors='none',alpha=alpha,label=label_1,rasterized=True,zorder=2)
+                   cax = ax.scatter(kpoints_dists,eig + 0.0,s=w_proj[:,ib]*size,c=color,edgecolors='none',alpha=alpha,label=label_1,rasterized=True,zorder=2)
 
             elif self.spin_components == 2:
                  w_proj1, w_proj2 = self.get_weights(selected_orbitals=selected_orbitals)

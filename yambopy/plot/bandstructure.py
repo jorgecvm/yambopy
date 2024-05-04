@@ -237,7 +237,7 @@ class YambopyBandStructure():
         color_map  = plt.get_cmap('seismic')
         for ib,band in enumerate(self.bands.T):
             x = self.distances
-            y = band-fermie
+            y = band-fermie-0.02
             if dashes is None:
                ax.plot(x,y,c=c_bands,lw=lw_label,label=c_label, alpha = 0.6)
             if dashes is not None:
