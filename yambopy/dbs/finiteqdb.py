@@ -10,7 +10,6 @@ from yambopy.dbs.qpdb import *
 from matplotlib import cm
 import matplotlib.pyplot as plt
 import matplotlib
-from tqdm import tqdm
 import time
 
 
@@ -1417,9 +1416,10 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         omega_vkl_q = np.zeros([self.nkpoints, self.nvbands, Nexcitons, self.nqpoints])
 
         if isinstance(energies_db,(YamboSaveDB,YamboElectronsDB)):
-           for iq in range(self.nqpoints):
 
-               for i_exc in range(Nexcitons):
+           for i_exc in range(Nexcitons):
+
+               for iq in range(self.nqpoints):
 
                    for i_k in range(self.nkpoints):
 
@@ -1427,21 +1427,23 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
                            i_v2 = self.unique_vbands[i_v]
                            k_c = kindx.qindx_X[iq,i_k,0] - 1
-                           omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v2] + eigenval_q.real[i_exc,iq]
-
-                   print(i_exc)
+                           omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v2] + eigenval_q.real[iq,i_exc]
+                    
+                           if omega_vkl_q[i_k,i_v,i_exc,iq] < 0:
+                              print(omega_vkl_q[i_k,i_v,i_exc,iq])
 
         elif isinstance(energies_db,YamboQPDB):   # To work correctly, the number of valence bands in BSEBands and the number of valence bands in the GW calculation must be the same.
-             for iq in range(self.nqpoints):
 
-               for i_exc in range(Nexcitons):
+             for i_exc in range(Nexcitons):
+
+                 for iq in range(self.nqpoints):
 
                      for i_k in range(self.nkpoints):
 
                          for i_v in range(self.nvbands):
  
                              k_c = kindx.qindx_X[iq,i_k,0] - 1
-                             omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v] + eigenval_q.real[i_exc,iq]
+                             omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v] + eigenval_q.real[iq,i_exc]
 
         else:
             raise ValueError("Energies argument must be an instance of YamboSaveDB,"
@@ -1458,21 +1460,21 @@ class YamboExcitonFiniteQ(YamboSaveDB):
          
         rho_q = np.zeros([self.nkpoints, self.nvbands, Nexcitons, self.nqpoints])
 
-        for iq in range(self.nqpoints):
+        for i_exc in range(Nexcitons):
 
-            for i_exc in range(Nexcitons):
+            for iq in range(self.nqpoints):
+
                 for t,kvc in enumerate(self.table):
                     k,v,c = kvc[0:3]-1    
                     i_v = v - self.unique_vbands[0] 
-                    rho_q[k,i_v,i_exc,iq] += abs2(eigenvec_q[t,i_exc,iq])
-                print(i_exc)
+                    rho_q[k,i_v,i_exc,iq] += abs2(eigenvec_q[t,iq,i_exc])
 
         return rho_q
 
 
-    def Boltz_dist(self, omega_1, omega_2, omega_step, Time, eigenvec_q, eigenval_q, Nexcitons):
+    def Boltz_dist(self, Time, eigenvec_q, eigenval_q, Nexcitons):
 
-        Btz_d = np.zeros([Nexcitons,self.nqpoints])
+        Btz_d = np.zeros([self.nqpoints,Nexcitons])
 
         k = 8.6173e-5
 
@@ -1483,156 +1485,263 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         sum_den = 0.0
 
-        for iq in range(self.nqpoints):
-            for i_exc in range(Nexcitons):
-                sum_den += np.exp( - (eigenval_q.real[i_exc,iq]) / (k*Temp) )
-                print(sum_den)
+        for i_exc in range(Nexcitons):
+            for iq in range(self.nqpoints):
+                sum_den += np.exp( - (eigenval_q.real[iq,i_exc]) / (k*Temp) )
 
-        for iq in range(self.nqpoints):
-            for i_exc in range(Nexcitons):
-                Btz_d[i_exc,iq] = ( ( np.exp( - (eigenval_q.real[i_exc,iq]) / (k*Temp) ) ) / ( sum_den ) )
-                print(Btz_d[i_exc,iq])
-
-        print(Btz_d)
+        for i_exc in range(Nexcitons):
+            for iq in range(self.nqpoints):
+                Btz_d[iq,i_exc] = ( ( np.exp( - (eigenval_q.real[iq,i_exc]) / (k*Temp) ) ) / ( sum_den ) )
 
         return Btz_d
 
-    def Gauss_dist(self, omega_1, omega_2, omega_step, sigma_omega, sigma_momentum, eigenval_q, iq_fixed, Time, Pump_energy, Nexcitons):
+    def Gauss_func(self, sigma_omega, sigma_momentum, omega_in, qmod_in, w_0, qmod_0):
 
-        omega_band  = np.arange(omega_1,omega_2,omega_step)
+        Gaussian = ( (1.0) / (sigma_omega  * np.sqrt(2.0 * np.pi) ) )*( np.exp( (-0.5)*( ( (omega_in - w_0)/(sigma_omega) )**2 ) ) )
 
-        Gauss_dis = np.zeros([len(omega_band),Nexcitons,self.nqpoints])
+        return Gaussian
+
+
+    def Gauss_dist(self,save, sigma_omega, sigma_momentum, eigenval_q, iq_fixed, Time, Pump_energy, Nexcitons):
+
+        Gauss_dis = np.zeros([self.nqpoints,Nexcitons])
 
         Exc_dif = Pump_energy - np.min(eigenval_q.real[0,:])
 
         w_0 = Pump_energy - (Exc_dif*Time)/(100)
 
+        qmod_0 = np.sqrt( abs2(save.red_kpoints[iq_fixed][0]) + abs2(save.red_kpoints[iq_fixed][1]) + abs2(save.red_kpoints[iq_fixed][2]) ) 
+
         if Time < 5:
 
-           for iq in range(self.nqpoints):
+           for i_exc in range(Nexcitons):
 
-               for i_exc in range(Nexcitons):
+                for iq in range(self.nqpoints):
 
-                   for w in range(len(omega_band)):
+                       qmod_in = np.sqrt( abs2(save.red_kpoints[iq][0]) + abs2(save.red_kpoints[iq][1]) + abs2(save.red_kpoints[iq][2]) ) 
 
-                       if iq == 0:
 
-                          Gauss_dis[w,i_exc,iq] = ( (1.0) / (sigma_omega * sigma_omega * sigma_momentum * np.sqrt(2.0 * np.pi)) )*( np.exp( (-0.5)*( ( (eigenval_q.real[i_exc,iq] - w_0)/(sigma_omega) )**2 ) ) ) * ( np.exp( (-0.5)*( ( (iq)/(sigma_momentum) )**2 ) ) )*( np.exp( (-0.5)*( ( (omega_band[w] - w_0)/(sigma_omega) )**2 ) ) )
-                          print(Gauss_dis[w,i_exc,iq])
-    
+                       if iq == iq_fixed:
+
+                          Gauss_dis[iq,i_exc] = self.Gauss_func(sigma_omega,sigma_momentum,eigenval_q.real[iq,i_exc],qmod_in,w_0,qmod_0)
 
                        else:
 
-                          Gauss_dis[w,i_exc,iq] = 0.0
+                          Gauss_dis[iq,i_exc] = 0.0
 
    
         if Time >= 5:
 
-           for iq in range(self.nqpoints):
+           for i_exc in range(Nexcitons):
 
-               for i_exc in range(Nexcitons):
+               for iq in range(self.nqpoints):
 
-                   for w in range(len(omega_band)):
+                   qmod_in = np.sqrt( abs2(save.red_kpoints[iq][0]) + abs2(save.red_kpoints[iq][1]) + abs2(save.red_kpoints[iq][2]) ) 
 
-                          Gauss_dis[w,i_exc,iq] = ( (1.0) / (sigma_omega * sigma_omega * sigma_momentum * np.sqrt(2.0 * np.pi)) )*( np.exp( (-0.5)*( ( (eigenval_q.real[i_exc,iq] - w_0)/(sigma_omega) )**2 ) ) ) * ( np.exp( (-0.5)*( ( (iq)/(sigma_momentum) )**2 ) ) )*( np.exp( (-0.5)*( ( (omega_band[w] - w_0)/(sigma_omega) )**2 ) ) )
+
+                   Gauss_dis[iq,i_exc] = self.Gauss_func(sigma_omega,sigma_momentum,eigenval_q.real[iq,i_exc],qmod_in,w_0,qmod_0)
+
+
+        Gauss_renorm = 0.0
+
+        for i_exc in range(Nexcitons):
+            for iq in range(self.nqpoints):
+              Gauss_renorm += Gauss_dis[iq,i_exc]
+
+        Gauss_dis = Gauss_dis/Gauss_renorm
 
         return Gauss_dis
 
-    def GBdist(self, omega_1, omega_2, omega_step, Time, Gauss_dis, Btz_d, Nexcitons):
+    def GBdist(self, Time, Gauss_dis, Btz_d, Nexcitons):
 
-        omega_band  = np.arange(omega_1,omega_2,omega_step)
-
-        GBdist = np.zeros([len(omega_band),Nexcitons,self.nqpoints])
+        GBdist = np.zeros([self.nqpoints,Nexcitons])
 
         x_values = np.linspace(-50, 50, 100)
 
         def sigmoid(x):
             return 1 / (1 + np.exp(-x))
 
-        def smooth_step_function(x, threshold=0, slope=0.10):
+        def smooth_step_function(x, threshold=0, slope=0.15):
             return sigmoid(slope * (x - threshold))
 
         Alpha = smooth_step_function(x_values)
 
-        if Time < 5:
+        Signal_construction = smooth_step_function(x_values, threshold = -40, slope = 0.70)
 
-           for iq in range(self.nqpoints):
+        if Time < 100:
 
-               for i_exc in range(Nexcitons):
+           for i_exc in range(Nexcitons):
 
-                   for w in range(len(omega_band)):
+               for iq in range(self.nqpoints):
 
-                       GBdist[w,i_exc,iq] = Gauss_dis[w,i_exc,iq] 
-                       if GBdist[w,i_exc,iq] < 1e-2:
-                          GBdist[w,i_exc,iq] = 0.0
+                   if (Btz_d[iq,i_exc] / Gauss_dis[iq,i_exc]) > 1e3:
 
-                       print(GBdist[w,i_exc,iq])
+                      GBdist[iq,i_exc] = 0.0
 
-        if Time >= 5 and Time < 100:
+                   else:
 
-           for iq in range(self.nqpoints):
-
-               for i_exc in range(Nexcitons):
-
-                   for w in range(len(omega_band)):
-
-                       GBdist[w,i_exc,iq] = (1.0 - Alpha[Time])*Gauss_dis[w,i_exc,iq] + Alpha[Time]*Btz_d[i_exc,iq] 
-
-                       #GBdist[w,i_exc,iq] = np.cos(Time*(np.pi/200))**2*Gauss_dis[w,i_exc,iq] + (1.0 - np.cos(Time*(np.pi/200))**2)*Btz_d[i_exc,iq]
-
-                       print(w, i_exc, iq, Gauss_dis[w,i_exc,iq], Btz_d[i_exc,iq], GBdist[w,i_exc,iq])
-
-                       if GBdist[w,i_exc,iq] < 1e-2:
-                          GBdist[w,i_exc,iq] = 0.0
-
-                       print(GBdist[w,i_exc,iq])
+                      GBdist[iq,i_exc] = ((1.0 - Alpha[Time])*Gauss_dis[iq,i_exc] + Alpha[Time]*Btz_d[iq,i_exc])*Signal_construction[Time]
 
         if Time >= 100:
 
-           for iq in range(self.nqpoints):
+           for i_exc in range(Nexcitons):
 
-               for i_exc in range(Nexcitons):
+               for iq in range(self.nqpoints):
 
-                   for w in range(len(omega_band)):
-
-                       GBdist[w,i_exc,iq] = Btz_d[i_exc,iq]
-
-                       if GBdist[w,i_exc,iq] < 1e-2:
-                          GBdist[w,i_exc,iq] = 0.0
-
-        print(np.max(Gauss_dis[:,:,0]), np.max(Gauss_dis[:,:,1]), np.max(Gauss_dis[:,:,2]), np.max(Gauss_dis[:,:,3]), np.max(Gauss_dis[:,:,4]), np.max(Gauss_dis[:,:,5]), np.max(Gauss_dis[:,:,6]))
-
+                   GBdist[iq,i_exc] = Btz_d[iq,i_exc]
 
         return GBdist
 
-    def exc_DOS(self, omega_1, omega_2, omega_step, sigma, eigenvec_q, eigenval_q, GBdist, Nexcitons):
+    def eigenvec_val_q(self,Nexcitons):
+
+        eigenval_q = np.zeros([self.nqpoints, Nexcitons], dtype = complex) 
+        eigenvec_q = np.zeros([len(self.eigenvectors[0]), self.nqpoints, Nexcitons], dtype = complex) 
+
+        for iq in range(self.nqpoints):
+
+            yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]     
+
+            for ik in range(Nexcitons):
+                eigenval_q[iq,ik] = yexc_list.eigenvalues[ik]
+
+                for t in range(len(self.eigenvectors[0])):
+                    eigenvec_q[t,iq,ik] = yexc_list.eigenvectors[ik,t]
+
+        return eigenval_q, eigenvec_q
+
+    def tr_excitonDOS(self, lat, omega_1, omega_2, omega_step, sigma, eigenval_q, eigenvec_q, Time, Pump_energy, iq_fixed, Nexcitons):
 
         omega_band  = np.arange(omega_1,omega_2,omega_step)
 
         eDOS = np.zeros(len(omega_band))
+        OccExcDOS = np.zeros(len(omega_band))
 
-        for iq in range(self.nqpoints):
+        sigma_omega = Time/300
+        sigma_momentum = Time/30
 
+        Gaussian = self.Gauss_dist(lat, sigma_omega, sigma_momentum, eigenval_q, iq_fixed, Time, Pump_energy, Nexcitons)
+        Boltz = self.Boltz_dist(Time, eigenvec_q, eigenval_q, Nexcitons)
+        GBdistribution = self.GBdist(Time, Gaussian, Boltz, Nexcitons)
+
+        for w in range(len(omega_band)):
+        
             for i_exc in range(Nexcitons):
 
-                for w in range(len(omega_band)):
+                for iq in range(self.nqpoints):
           
-                    eDOS[w] += np.exp( -( omega_band[w] - eigenval_q.real[i_exc,iq] )**2 / (2 * sigma**2) ) / ( np.sqrt(2 * np.pi) * sigma )
-
-        eDOS_norm = eDOS/np.amax(eDOS)
-
-        return omega_band, eDOS_norm  
+                    eDOS[w] += self.Gauss_func(sigma, 1.0, eigenval_q[iq,i_exc].real, 0.0, omega_band[w], 0.0)
+                    OccExcDOS[w] += self.Gauss_func(sigma, 1.0, eigenval_q[iq,i_exc].real, 0.0, omega_band[w], 0.0) * GBdistribution[iq,i_exc]
+                    print(omega_band[w])
 
 
-    def arpes_intensity_interpolated_finiteq(self,energies_db,kindx,path,ax,cx,dx,Time,Pump_energy,Nexcitons,lpratio=5,f=None,size=1,verbose=True,**kwargs):
+        return omega_band, eDOS, OccExcDOS
+
+    def PE_distribution(self,ax,energies_db,Time,eigenval_q,eigenvec_q,iq_fixed,Pump_energy,Nexcitons,**kwargs):
         
-        """ 
-            Interpolate arpes bandstructure using SKW interpolation from Abipy (version 1)
-            Change to the Fourier Transform Interpolation
-            DFT energies == energies_db
-            All is done internally. No use of the bandstructure class
-            (something to change)
-        """
+        Time_dis_T = np.linspace(0, 350, 350)
+
+        TempInset = 10000*np.exp(-(Time_dis_T)/50)
+
+        
+
+        x_values = np.linspace(-50, 50, 100)
+
+        def sigmoid(x):
+            return 1 / (1 + np.exp(-x))
+
+        def smooth_step_function(x, threshold=0, slope=0.15):
+            return sigmoid(slope * (x - threshold))
+
+        Alpha_dis = smooth_step_function(x_values)
+
+        sigma_omega = Time/300
+        sigma_momentum = Time/50
+
+        Gaussian = self.Gauss_dist(energies_db, sigma_omega, sigma_momentum, eigenval_q, iq_fixed, Time, Pump_energy, Nexcitons)
+        Boltz = self.Boltz_dist(Time, eigenvec_q, eigenval_q, Nexcitons)
+
+
+        ax.plot(Time_dis_T,TempInset, color = 'darkorange', lw = 2, label = 'T(t)')
+
+        ax.legend(loc = (0.70,0.95), frameon = False)
+
+        ax.set_xlim(0.0,350.0)
+        ax.set_ylim(0.0,10000)
+
+        ax2 = ax.twinx()
+        ax2.set_xlim(0.0,350.0)
+        ax2.set_ylim(0.00,1.00)
+
+        ax2.plot(x_values + 50,Alpha_dis, color = 'magenta', lw = 2, label = 'Alpha (t)')
+
+
+        ax2.axvline(x = Time, linestyle = 'dashed', lw = 1, color = 'black')
+        ax2.legend(loc = (0.70,0.90), frameon = False)
+        
+        GaussianPerc = '% Gaussian'
+        BoltzmannPerc = '% Boltzmann'
+        PumpEnergyPerc = '$\omega_{0}$ = '
+        PumpEnergyPerc_time = '$\omega$(t) = '
+        Time_perc = 'Time = '
+        Temp_perc = 'Temp = '
+
+
+        Exc_dif_Perc = Pump_energy - np.min(eigenval_q.real[0,:])
+
+        w_0_Perc = Pump_energy - (Exc_dif_Perc*Time)/(100)
+
+        if Time < 100:
+           ax.text(248,8600,f"{((1-Alpha_dis[Time])*100):.3f} {GaussianPerc}")
+           ax.text(248,8200,f"{(Alpha_dis[Time]*100):.3f} {BoltzmannPerc}")
+           ax.text(248,7800,f"{PumpEnergyPerc} {Pump_energy:.3f} {'eV'}")
+           ax.text(248,7400,f"{PumpEnergyPerc_time} {w_0_Perc:.3f} {'eV'}")
+           ax.text(248,7000,f"{Temp_perc} {TempInset[Time]:.0f}")
+
+        else:
+           ax.text(248,8600,f"{0.0} {GaussianPerc}")
+           ax.text(248,8200,f"{100} {BoltzmannPerc}")          
+           ax.text(248,7800,f"{PumpEnergyPerc} {Pump_energy:.3f} {'eV'}")
+           ax.text(248,7200,f"{PumpEnergyPerc_time} {(Pump_energy - Exc_dif_Perc):.3f} {'eV'}") 
+           ax.text(248,7000,f"{Temp_perc} {TempInset[Time]:.0f}")
+
+        ax.text(248,6600,f"{Time_perc} {Time}")
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Temperature')
+        ax2.set_ylabel('Distribution - Gaussian vs Boltzmann', rotation = 270, labelpad = 20)
+
+        ax.spines["bottom"].set_linewidth(1)
+        ax.spines["top"].set_linewidth(1)
+        ax.spines["right"].set_linewidth(1)
+        ax.spines["left"].set_linewidth(1)
+        ax.tick_params(labelsize=12, top = 'on', right = 'on', direction = 'in')
+        ax.tick_params(axis = 'x', pad = 5)
+        ax.tick_params(axis = 'y', pad = 10)
+        ax.yaxis.label.set_size(12)
+        ax.xaxis.label.set_size(12)
+        ax2.spines["bottom"].set_linewidth(1)
+        ax2.spines["top"].set_linewidth(1)
+        ax2.spines["right"].set_linewidth(1)
+        ax2.spines["left"].set_linewidth(1)
+        ax2.tick_params(labelsize=12, top = 'on', right = 'on', direction = 'in')
+        ax2.tick_params(axis = 'x', pad = 5)
+        ax2.tick_params(axis = 'y', pad = 10)
+        ax2.yaxis.label.set_size(12)
+        ax2.xaxis.label.set_size(12)
+        
+        ind = (0, 2000, 4000, 6000, 8000, 10000)
+
+        ax.yaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
+        ax.set_yticklabels(['0', '2000', '4000', '6000', '8000', '10000'])
+
+        ind2 = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
+
+        ax2.yaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind2))
+        ax2.set_yticklabels(['0', '0.2', '0.4', '0.6', '0.8', '1.0'])
+        
+        return 
+
+    def Photoemission(self,energies_db,kindx,path,ax,cx,bx,Time,eigenval_q,eigenvec_q,Pump_energy,Nexcitons,iq_fixed,lpratio=5,f=None,size=1,verbose=True,**kwargs):
+
         from abipy.core.skw import SkwInterpolator
         Im = 1.0j # Imaginary
         
@@ -1640,10 +1749,10 @@ class YamboExcitonFiniteQ(YamboSaveDB):
            print("This interpolation is provided by the SKW interpolator implemented in Abipy")
 
         # Options kwargs
-
         # Alignment of the Bands Top Valence
         fermie      = kwargs.pop('fermie',0)
         # Parameters ARPES Intensity
+
         omega_width = kwargs.pop('omega_width',0)
         omega_1     = kwargs.pop('omega_1',0)
         omega_2     = kwargs.pop('omega_2',0)
@@ -1653,14 +1762,14 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         sigma     = kwargs.pop('sigma',0)
         cmap_name   = kwargs.pop('cmap_name',0)
         scissor    = kwargs.pop('scissor',0)
-       
+
         # Lattice and Symmetry Variables
         lattice = self.lattice
         cell = (lattice.lat, lattice.red_atomic_positions, lattice.atomic_numbers)
         symrel = [sym for sym,trev in zip(lattice.sym_rec_red,lattice.time_rev_list) if trev==False ]
         time_rev = True
-
         nelect = 0  
+
 
         #get DFT or GW eigenvalues
         if isinstance(energies_db,(YamboSaveDB,YamboElectronsDB)):
@@ -1672,34 +1781,18 @@ class YamboExcitonFiniteQ(YamboSaveDB):
             raise ValueError("Energies argument must be an instance of YamboSaveDB,"
                              "YamboElectronsDB or YamboQPDB. Got %s"%(type(energies)))
 
-        eigenval_q = np.zeros([Nexcitons, self.nqpoints], dtype = complex) 
-        eigenvec_q = np.zeros([len(self.eigenvectors[0]), Nexcitons, self.nqpoints], dtype = complex) 
-
-        for iq in range(self.nqpoints):
-
-            yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]     
-
-            for ik in range(Nexcitons):
-                eigenval_q[ik,iq] = yexc_list.eigenvalues[ik]
-
-                for t in range(len(self.eigenvectors[0])):
-                    eigenvec_q[t,ik,iq] = yexc_list.eigenvectors[ik,t]
-
         rho_q = self.calculate_rho_finiteq(kindx, eigenvec_q, eigenval_q, Nexcitons)
-
         omega_q    = self.calculate_omega_finiteq(energies,energies_db,kindx, eigenvec_q, eigenval_q, Nexcitons)
-
         ibz_nkpoints = max(lattice.kpoints_indexes)+1
-        kpoints = lattice.red_kpoints
 
         #map from bz -> ibz:
         ibz_rho_q     = np.zeros([ibz_nkpoints,self.nvbands,Nexcitons,self.nqpoints])
-        ibz_kpoints = np.zeros([ibz_nkpoints,3])
         ibz_omega_q   = np.zeros([ibz_nkpoints,self.nvbands,Nexcitons,self.nqpoints])
+        ibz_kpoints   = energies_db.red_kpoints
 
         rho_max = np.zeros([self.nkpoints, self.nvbands, Nexcitons, self.nqpoints])
         omega_max = np.zeros([self.nkpoints, self.nvbands, Nexcitons, self.nqpoints])
-
+        
         for iq in range(self.nqpoints):
 
             for idx_bz,idx_ibz in enumerate(lattice.kpoints_indexes):
@@ -1733,9 +1826,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
                               print('C',iq,idx_ibz,idx_bz,i_exc)
 
-        for idx_bz,idx_ibz in enumerate(lattice.kpoints_indexes):
-            ibz_kpoints[idx_ibz]   = lattice.red_kpoints[idx_bz]
-
         #get DFT or GW eigenvalues
         if isinstance(energies_db,(YamboSaveDB,YamboElectronsDB)):
             ibz_energies = energies_db.eigenvalues[0,:,self.start_band:self.mband] #spin-up
@@ -1750,28 +1840,31 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         distances = calculate_distances(kpoints_path)
         nkpoints_path = kpoints_path.shape[0]
         na = np.newaxis
+
         rho_q_path   = np.zeros([1, nkpoints_path, self.nvbands, Nexcitons, self.nqpoints])
         omega_q_path = np.zeros([1, nkpoints_path, self.nvbands, Nexcitons, self.nqpoints])
         
+        fullbz_nkpoints = len(lattice.red_kpoints)
 
         # I(k,omega_band)
         Intensity_q = np.zeros([n_omegas,nkpoints_path]) 
-
+        Intensity_full_BZ = np.zeros([n_omegas,fullbz_nkpoints]) 
+        
         sigma_omega = Time/300
-        sigma_momentum = Time/20
+        sigma_momentum = Time/50
         label_string_1 = "Time = "
         label_string_2 = "Sigma_w = "
         label_string_3 = "Sigma_q = "
-
+        
         print(f"{label_string_1} {Time} | {label_string_2} {sigma_omega} | {label_string_3} {sigma_momentum}")
+       
+        Gaussian = self.Gauss_dist(energies_db, sigma_omega, sigma_momentum, eigenval_q, iq_fixed, Time, Pump_energy, Nexcitons)
+        Boltz = self.Boltz_dist(Time, eigenvec_q, eigenval_q, Nexcitons)
+        GBdistribution = self.GBdist(Time, Gaussian, Boltz, Nexcitons)
 
-        Gauss_dis = self.Gauss_dist(omega_1, omega_2, omega_step, sigma_omega, sigma_momentum, eigenval_q, self.Qpt, Time, Pump_energy, Nexcitons)
-        Btz_d = self.Boltz_dist(omega_1, omega_2, omega_step, Time, eigenvec_q, eigenval_q, Nexcitons)
-        GBdis = self.GBdist(omega_1, omega_2, omega_step, Time, Gauss_dis, Btz_d, Nexcitons)
+        for i_exc in range(Nexcitons):
 
-        for iq in range(self.nqpoints):
-
-            for i_exc in range(Nexcitons):
+            for iq in range(self.nqpoints):
 
                 # interpolate rho along the k-path
                 skw_rho_q   = SkwInterpolator(lpratio,ibz_kpoints,ibz_rho_q[na,:,:,i_exc,iq],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
@@ -1780,24 +1873,44 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                 # interpolate omega along the k-path
                 skw_omega_q = SkwInterpolator(lpratio,ibz_kpoints,ibz_omega_q[na,:,:,i_exc,iq],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
                 omega_q_path[0,:,:,i_exc,iq] = skw_omega_q.interp_kpts(kpoints_path).eigens
+
       
+        rho_q_path[rho_q_path < 0] = 0
+
         # interpolate energies
 
         skw_energie = SkwInterpolator(lpratio,ibz_kpoints,ibz_energies[na,:,:],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
         energies_path = skw_energie.interp_kpts(kpoints_path).eigens
 
         top_valence_band = np.max(energies_path[0,:,0:self.nvbands])
-          
-        omega_q_path    = omega_q_path - top_valence_band
+
         energies_path = energies_path - top_valence_band
 
-        import matplotlib.pyplot as plt
+        omega_q_path = omega_q_path - top_valence_band
 
-        for iq in range(self.nqpoints):
+        omega_q = omega_q - top_valence_band
+
+        import matplotlib.pyplot as plt
+        
+        ############################################
+        ##### tr-ARPES interpolated along path #####
+        ############################################
+
+        step_tr_arpes_along_path = n_omegas // 20  # 5% of total_loops
+
+        start_time = time.time()
+
+        print("")
+        print("")
+        print("tr-ARPES calculation along path")
+        print("")
+        print("Progress: 0%, Estimated time remaining: Calculating...")
+
+        for i_o in range(n_omegas):
 
             for i_exc in range(Nexcitons):
 
-                for i_o in range(n_omegas):
+                for iq in range(self.nqpoints):
 
                     for i_k in range(nkpoints_path):
 
@@ -1805,9 +1918,82 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
                             delta_q = 1.0/( omega_band[i_o] - omega_q_path[0, i_k, i_v, i_exc, iq] + Im*omega_width )
 
-                            Intensity_q[i_o,i_k] += 2*np.pi*GBdis[i_o,i_exc,iq]*rho_q_path[0, i_k, i_v, i_exc, iq]*delta_q.imag
+                            Intensity_q[i_o,i_k] += 2*np.pi*GBdistribution[iq,i_exc]*rho_q_path[0, i_k, i_v, i_exc, iq]*(-delta_q.imag)
 
-                            print(i_o,i_k,i_v,i_k,i_exc,iq,GBdis[i_o,i_exc,iq],rho_q_path[0, i_k, i_v, i_exc, iq],delta_q.imag,Intensity_q[i_o,i_k])
+            if (i_o + 1) % step_tr_arpes_along_path == 0 or i_o == n_omegas - 1:
+               elapsed_time = time.time() - start_time
+               progress = ((i_o + 1) / n_omegas) * 100
+               estimated_total_time = (elapsed_time / (i_o + 1)) * n_omegas
+               estimated_time_remaining = estimated_total_time - elapsed_time
+
+               # Convert times to hours, minutes, and seconds
+               elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
+               remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
+
+               print(f"Progress: {progress:.1f}%, Estimated time remaining: {remaining_hours}h {remaining_minutes}m {remaining_seconds}s\n")
+
+        # Final time
+        end_time = time.time()
+        total_time = end_time - start_time
+        total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
+
+        print(f"Total time taken: {total_hours}h {total_minutes}m {total_seconds}s\n")
+
+        ############################################
+        ##### tr-ARPES interpolated along path #####
+        ############################################
+
+        ###############################################
+        ##### tr-ARPES interpolated along full BZ #####
+        ###############################################
+
+        step_tr_arpes_full_bz = n_omegas // 20  # 5% of total_loops
+
+        start_time = time.time()
+
+        print("")
+        print("")
+        print("tr-ARPES calculation full bz")
+        print("")
+        print("Progress: 0%, Estimated time remaining: Calculating...")
+
+        for i_o in range(n_omegas):
+
+            for i_exc in range(Nexcitons):
+
+                for iq in range(self.nqpoints):
+
+                    for i_k in range(fullbz_nkpoints):
+
+                        for i_v in range(self.nvbands): 
+
+                            delta_q = 1.0/( omega_band[i_o] - omega_q[i_k, i_v, i_exc, iq] + Im*omega_width )
+
+                            Intensity_full_BZ[i_o,i_k] += 2*np.pi*GBdistribution[iq,i_exc]*rho_q[i_k, i_v, i_exc, iq]*(-delta_q.imag)
+
+
+            if (i_o + 1) % step_tr_arpes_full_bz == 0 or i_o == n_omegas - 1:
+               elapsed_time = time.time() - start_time
+               progress = ((i_o + 1) / n_omegas) * 100
+               estimated_total_time = (elapsed_time / (i_o + 1)) * n_omegas
+               estimated_time_remaining = estimated_total_time - elapsed_time
+
+               # Convert times to hours, minutes, and seconds
+               elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
+               remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
+
+               print(f"Progress: {progress:.1f}%, Estimated time remaining: {remaining_hours}h {remaining_minutes}m {remaining_seconds}s\n")
+
+        # Final time
+        end_time = time.time()
+        total_time = end_time - start_time
+        total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
+
+        print(f"Total time taken: {total_hours}h {total_minutes}m {total_seconds}s\n")
+
+        ###############################################
+        ##### tr-ARPES interpolated along full BZ #####
+        ###############################################
 
         X, Y = np.meshgrid(distances, omega_band)
         import matplotlib.pyplot as plt
@@ -1837,8 +2023,9 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                ax.plot(distances,energies_path[0,:,i_b+self.nvbands],lw=1.0,color='white')
 
         ax.set_xlim((distances[0],distances[-1]))
-        ax.set_ylim((omega_1,omega_2-omega_width))
 
+        ax.set_ylim((omega_1,omega_2-omega_width))
+        
         #plt.axhline(np.max(energies_path[0,:,0:self.nvbands]),c='white')
         for kpoint, klabel, distance in path:
             ax.axvline(distance,c='w')
@@ -1846,253 +2033,51 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         ax.set_xticks(path.distances)
         ax.set_xticklabels(path.klabels)
 
-        exc_DOS = np.zeros(n_omegas)
+        ax.set_title(f"Time = {Time}")
+
+
+        PE_path = np.zeros(n_omegas)
+        PE_full_BZ = np.zeros(n_omegas)
 
         for i_w in range(n_omegas):
             for i_k in range(nkpoints_path):
-                exc_DOS[i_w] += Intensity_q[i_w,i_k]
+                PE_path[i_w] += Intensity_q[i_w,i_k]
 
-        exc_DOS = -exc_DOS
+        for i_w in range(n_omegas):
+            for i_k in range(fullbz_nkpoints):
+                PE_full_BZ[i_w] += Intensity_full_BZ[i_w,i_k]
 
-        if np.amax(exc_DOS) == 0:
-           exc_DOS_norm = exc_DOS
+        PE_path = PE_path/np.amax(PE_path)
+        PE_full_BZ = PE_full_BZ/np.amax(PE_full_BZ)
 
-        else:
-           exc_DOS_norm = exc_DOS/np.amax(exc_DOS)
+        bx.plot(PE_path,omega_band, color = 'darkblue', lw = 1.5, label = "PE - Along path")
+        bx.legend(loc = 'lower right', frameon = False)
+        bx.set_ylim((omega_1,omega_2))
+        bx.set_xlim((0.0,max(PE_path)))
 
-        #bx.plot(exc_DOS_norm,omega_band, color = 'darkblue', lw = 1.5, label = f"Time = {Time}")
-        #bx.set_ylim((omega_1,omega_2))
-        #bx.set_xlim((0.0,1.0))
-        #bx.fill_between(exc_DOS_norm,omega_band, color = 'blue', alpha = 0.3)
+        bx.yaxis.set_ticklabels([]) 
+        bx.yaxis.set_ticks([]) 
 
-        eDOS_x, eDOS_y = self.exc_DOS(omega_1, omega_2, omega_step, sigma, eigenvec_q, eigenval_q, GBdis, Nexcitons)
+        ind = (0.0, 0.5, 1.0)
+        bx.xaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
+        bx.set_xticklabels(['0.0', '0.5', '1.0'])
 
-        ExcitonDOS = eDOS_y*exc_DOS_norm
+        bx.tick_params(top=True, labeltop=True, labelbottom=False)
 
-        dx.plot(eDOS_y, eDOS_x, color = 'black', lw = 1.5, label = 'Exciton density')
+        cx.plot(PE_full_BZ,omega_band, color = 'crimson', lw = 1.5, label = f"PE - Full BZ")
+        cx.legend(loc = 'lower right', frameon = False)
+        cx.set_ylim((omega_1,omega_2))
+        cx.set_xlim((0.0,max(PE_full_BZ)))
 
-        dx.plot(ExcitonDOS, eDOS_x, color = 'red', lw = 1.5, label = 'Occupied excitons')
-
-        dx.legend(loc = 'lower right', frameon = False, fontsize = 10)
-
-        dx.set_ylim((omega_1,omega_2))
-
-        if np.max(ExcitonDOS) == 0:
-           dx.set_xlim((0.0,np.amax(eDOS_y)))
-
-        else:
-           dx.set_xlim((0.0,np.amax(eDOS_y)))
-
-        ax.spines["bottom"].set_linewidth(1)
-        ax.spines["top"].set_linewidth(1)
-        ax.spines["right"].set_linewidth(1)
-        ax.spines["left"].set_linewidth(1)
-        ax.tick_params(labelsize=14, top = 'on', right = 'on', direction = 'in')
-        ax.tick_params(axis = 'x', pad = 10)
-        ax.tick_params(axis = 'y', pad = 12)
-        ax.yaxis.label.set_size(14)
-        ax.xaxis.label.set_size(14)
-
-        ax.set_ylabel('Energy (eV)')
-
-        cx.spines["bottom"].set_linewidth(1)
-        cx.spines["top"].set_linewidth(1)
-        cx.spines["right"].set_linewidth(1)
-        cx.spines["left"].set_linewidth(1)
-        cx.tick_params(labelsize=12, top = 'on', right = 'on', direction = 'in')
-        cx.tick_params(axis = 'x', pad = 5)
-        cx.tick_params(axis = 'y', pad = 10)
-        cx.yaxis.label.set_size(12)
-        cx.xaxis.label.set_size(12)
         cx.yaxis.set_ticklabels([]) 
-        cx.yaxis.set_ticklabels([]) 
-        #cx.xaxis.tick_top()
-
-        #ind = (0.0, 0.5, 1.0)
-        #bx.xaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
-        #bx.set_xticklabels(['0.0','0.5', '1.0'])
-
-        
-        dx.spines["bottom"].set_linewidth(1)
-        dx.spines["top"].set_linewidth(1)
-        dx.spines["right"].set_linewidth(1)
-        dx.spines["left"].set_linewidth(1)
-        dx.tick_params(labelsize=14, top = False, right = False, bottom = True, left = False, direction = 'in')
-        dx.tick_params(axis = 'x', pad = 10)
-        dx.tick_params(axis = 'y', pad = 12)
-        dx.yaxis.label.set_size(14)
-        dx.xaxis.label.set_size(14)
-
-        dx.legend(loc = 'lower right', frameon = False, fontsize = 8)
-        dx.yaxis.set_ticklabels([]) 
-        dx.xaxis.set_ticklabels([]) 
-        #dx.xaxis.tick_top()
-        
-        Time_dis_T = np.linspace(0, 250, 10000)
-
-        TempInset = 10000*np.exp(-(Time_dis_T)/50)
-
-        x_values = np.linspace(-50, 50, 100)
-
-        def sigmoid(x):
-            return 1 / (1 + np.exp(-x))
-
-        def smooth_step_function(x, threshold=0, slope=0.10):
-            return sigmoid(slope * (x - threshold))
-
-        Alpha_dis = smooth_step_function(x_values)
-
-        cx.plot(Time_dis_T,TempInset, color = 'darkorange', lw = 2, label = 'T(t)')
-
-        cx.legend(loc = (0.53,0.95), frameon = False)
-
-        cx2 = cx.twinx()
-        cx2.set_xlim(0.0,250.0)
-        cx2.set_ylim(0.00,1.00)
-
-        cx2.plot(x_values + 50,Alpha_dis, color = 'magenta', lw = 2, label = 'Alpha (t)')
-
-
-        cx2.axvline(x = Time, linestyle = 'dashed', lw = 1, color = 'black')
-        cx2.legend(loc = (0.53,0.90), frameon = False)
-
-        GaussianPerc = '% Gaussian'
-        BoltzmannPerc = '% Boltzmann'
-        PumpEnergyPerc = '$\omega_{0}$ = '
-        PumpEnergyPerc_time = '$\omega$(t) = '
-        Time_perc = 'Time = '
-
-
-        Exc_dif_Perc = Pump_energy - np.min(eigenval_q.real[0,:])
-
-        w_0_Perc = Pump_energy - (Exc_dif_Perc*Time)/(100)
-
-        cx.text(110,9000,f"{1-Alpha_dis[Time]:.3f} {GaussianPerc}")
-        cx.text(110,8500,f"{Alpha_dis[Time]:.3f} {BoltzmannPerc}")
-        cx.text(110,8000,f"{PumpEnergyPerc} {Pump_energy:.3f} {'eV'}")
-        cx.text(110,7500,f"{PumpEnergyPerc_time} {w_0_Perc:.3f} {'eV'}")
-        cx.text(110,7000,f"{Time_perc} {Time}")
-        cx.set_xlabel('Time')
-        cx2.set_ylabel('Temperature', rotation = 270, fontsize = 12)
-        cx2.spines["bottom"].set_linewidth(1)
-        cx2.spines["top"].set_linewidth(1)
-        cx2.spines["right"].set_linewidth(1)
-        cx2.spines["left"].set_linewidth(1)
-        cx2.tick_params(labelsize=12, top = 'on', right = 'on', direction = 'in')
-        cx2.tick_params(axis = 'x', pad = 5)
-        cx2.tick_params(axis = 'y', pad = 10)
-        cx2.yaxis.label.set_size(12)
-        cx2.xaxis.label.set_size(12)
+        cx.yaxis.set_ticks([]) 
  
-        ind = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
-        cx2.yaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
-        cx2.set_yticklabels(['0', '2000', '4000', '6000', '8000', '10000'])
+        ind = (0.0, 0.5, 1.0)
+        cx.xaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
+        cx.set_xticklabels(['0.0', '0.5', '1.0'])
 
-        '''
-        fig2 = plt.figure(figsize=(9,9))
-        dx  = fig2.add_axes( [ 0.15, 0.10, 0.700, 0.85 ])
-        ex  = fig2.add_axes( [ 0.375, 0.40, 0.375, 0.35 ])
+        cx.tick_params(bottom=True, labelbottom=True)
 
-        Time_dis_T = np.linspace(0, 400, 10000)
-        Time_dis_alpha = np.linspace(0, 100, 10000)
-
-        dx.plot(Time_dis_alpha, np.cos(Time_dis_alpha*(np.pi/200))**2, color = 'magenta', lw = 2, label = 'alpha (t)')
-
-        dx.spines["bottom"].set_linewidth(1)
-        dx.spines["top"].set_linewidth(1)
-        dx.spines["right"].set_linewidth(1)
-        dx.spines["left"].set_linewidth(1)
-        dx.tick_params(labelsize=12, top = 'on', right = 'on', direction = 'in')
-        dx.tick_params(axis = 'x', pad = 5)
-        dx.tick_params(axis = 'y', pad = 10)
-        dx.yaxis.label.set_size(12)
-        dx.xaxis.label.set_size(12)
-        dx.set_xlim((0.0,400.0))
-        dx.set_ylim((0.0,1.0))
-
-        if Time < 85:
-  
-           dx.axvline(x = Time, linestyle = 'dashed', lw = 1, color = 'black')
-
-        else:
-
-           dx.axvline(x = Time, ymax = 0.3, linestyle = 'dashed', lw = 1, color = 'black')
-           dx.axvline(x = Time, ymin = 0.8, linestyle = 'dashed', lw = 1, color = 'black')
-
-        dx.axhline(y = 0, xmin = 0.25, color = 'magenta', lw = 2)
-
-        dx2 = dx.twinx()
-        dx2.set_xlim(0.0,400.0)
-        dx2.set_ylim(0,10000)
-        dx2.spines["bottom"].set_linewidth(1)
-        dx2.spines["top"].set_linewidth(1)
-        dx2.spines["right"].set_linewidth(1)
-        dx2.spines["left"].set_linewidth(1)
-        dx2.tick_params(labelsize=12, top = 'on', right = 'on', direction = 'in')
-        dx2.tick_params(axis = 'x', pad = 5)
-        dx2.tick_params(axis = 'y', pad = 10)
-        dx2.yaxis.label.set_size(12)
-        dx2.xaxis.label.set_size(12)
-        dx2.plot(Time_dis_T, 10000*np.exp(-(Time_dis_T)/50), color = 'darkorange', lw = 2, label = 'T(t)')
-        dx.set_xlabel('Time', fontsize = 12)
-        dx2.set_ylabel('Temperature (t)', rotation = 270, fontsize = 12)
-
-        dx.legend(loc = 'upper right', frameon = False, fontsize = 12)
-        dx2.legend(loc = 'upper center', frameon = False, fontsize = 12)
-
-        ind = (0.00, 0.25, 0.50, 0.75, 1.00)
-        dx.yaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
-        dx.set_yticklabels(['100% Btz','75% Btz','50% GS', '75% GS','100% GS'])
-
-        #ex.plot(Time_dis, np.exp(-(Time_dis)/50), color = 'magenta', lw = 2, label = 'alpha (t)')
-        ex.plot(Time_dis_alpha, np.cos(Time_dis_alpha*(np.pi/200))**2, color = 'magenta', lw = 2, label = 'alpha (t)')
-
-        ex.spines["bottom"].set_linewidth(1)
-        ex.spines["top"].set_linewidth(1)
-        ex.spines["right"].set_linewidth(1)
-        ex.spines["left"].set_linewidth(1)
-        ex.tick_params(labelsize=12, top = 'on', right = 'on', direction = 'in')
-        ex.tick_params(axis = 'x', pad = 5)
-        ex.tick_params(axis = 'y', pad = 10)
-        ex.yaxis.label.set_size(12)
-        ex.xaxis.label.set_size(12)
-        ex.set_xlim((100.0,400.0))
-        ex.set_ylim((0.0,0.030))
-        ex.axvline(x = Time, linestyle = 'dashed', lw = 1, color = 'black')
-        ex.axhline(y = 0, color = 'magenta', lw = 2)
-
-        ex2 = ex.twinx()
-        ex2.set_xlim(100.0,400.0)
-        ex2.set_ylim(0,300)
-        ex2.spines["bottom"].set_linewidth(1)
-        ex2.spines["top"].set_linewidth(1)
-        ex2.spines["right"].set_linewidth(1)
-        ex2.spines["left"].set_linewidth(1)
-        ex2.tick_params(labelsize=12, top = 'on', right = 'on', direction = 'in')
-        ex2.tick_params(axis = 'x', pad = 5)
-        ex2.tick_params(axis = 'y', pad = 10)
-        ex2.yaxis.label.set_size(12)
-        ex2.xaxis.label.set_size(12)
-        ex2.plot(Time_dis_T, 10000*np.exp(-(Time_dis_T)/50), color = 'darkorange', lw = 2, label = 'T(t)')
-
-        ex.set_xlabel('Time', fontsize = 12)
-        ex2.set_ylabel('Temperature (t)', rotation = 270, fontsize = 12)
-        ex2.yaxis.set_label_coords(1.225,0.5)
-
-        ind = (0.00, 0.03, 0.25, 0.50, 0.75, 1.00)
-        ex.yaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
-        ex.set_yticklabels(['100% Btz','97% Btz','75% Btz','50% GS', '75% GS','100% GS'])
-
-        Exc_dif = Pump_energy - np.min(eigenval_q.real[0,:])
-        w_0 = Pump_energy - (Exc_dif*Time)/(100)
-
-        InitialEnergy = "E0(t) = "
-        InitialExcValue = round(w_0,3)
-
-        dx.text(300,0.03,f"{InitialEnergy} {InitialExcValue}", color = 'black', fontsize = 12)
-
-        plt.savefig('Distribution.png')
-        '''
         return 
 
 
@@ -2101,16 +2086,240 @@ class YamboExcitonFiniteQ(YamboSaveDB):
     #  ARPES finite-q #
     ##########################################
 
+    def ExcModulusSquare(self,kindx,ax,Nexcitons,Vband,lat,path,SumoverPath,**kwargs):
+
+        from scipy.interpolate import CubicSpline, pchip
+        eigenval_q = np.zeros([Nexcitons, self.nqpoints], dtype = complex) 
+        eigenvec_q = np.zeros([len(self.eigenvectors[0]), Nexcitons, self.nqpoints], dtype = complex) 
+
+        for iq in range(self.nqpoints):
+
+            yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]     
+
+            for ik in range(Nexcitons):
+                eigenval_q[ik,iq] = yexc_list.eigenvalues[ik]
+
+                for t in range(len(self.eigenvectors[0])):
+                    eigenvec_q[t,ik,iq] = yexc_list.eigenvectors[ik,t]
 
 
 
+        ExcitonQnumber = np.zeros(self.nqpoints)
+        ExcitonIndex = np.zeros(self.nqpoints)
+        AbsModArray = np.zeros(self.nqpoints)
 
 
+        ComputedPath = lat.get_path(path)[1]
+
+        if SumoverPath == 'True':
+
+           for i_exc in range(Nexcitons):
+
+               for iq in range(self.nqpoints):
+
+                   AbsMod= 0.0
+
+                   for t,kvc in enumerate(self.table):
+
+                      k,v,c = kvc[0:3]-1   
+
+                      if any(np.array_equal(k, matrix) for matrix in ComputedPath):
+                  
+                         print('True', k)
+ 
+                         if v == self.unique_vbands[-Vband]:
+                   
+                            AbsMod += abs2(eigenvec_q[t,i_exc,iq])
+
+                      else:
+
+                         print('False', k)
+                   
+                   AbsModArray[iq] = AbsMod
+                
+                   ExcitonQnumber[iq] = np.round( np.sqrt( abs2(lat.ibz_kpoints[iq][0]) + abs2(lat.ibz_kpoints[iq][1]) + abs2(lat.ibz_kpoints[iq][2]) )  ,6)
+                   ExcitonIndex[iq] = eigenval_q.real[i_exc,iq]
+               '''
+               f1 = pchip(ExcitonQnumber, ExcitonIndex)
+               f2 = pchip(ExcitonQnumber, AbsModArray)
+
+               x_interp = np.linspace(0, self.nqpoints-1, 1000)
+
+               y1_interp = f1(x_interp)
+               y2_interp = f2(x_interp)
+ 
+               ax.plot(x_interp,y1_interp, color = 'black', zorder = 1)
+               '''           
+               #ax.plot(ExcitonQnumber,ExcitonIndex,color = 'black')
+               ax.scatter(ExcitonQnumber,ExcitonIndex, s = 300*AbsModArray, c = 300*AbsModArray, cmap = 'viridis', vmin = 0.0, vmax = 300.0, zorder = 2, edgecolor = 'black')
+
+          
+        if SumoverPath == 'False':
+
+           PathinKvalues = lat.car_kpoints[ComputedPath]
+
+           SelectedPath = np.zeros(len(PathinKvalues))
+
+           for i in range(len(ComputedPath)):
+
+              SelectedPath[i] = np.round( np.sqrt( abs2(PathinKvalues[i][0]) + abs2(PathinKvalues[i][1]) + abs2(PathinKvalues[i][2]) )  ,6)
+
+           for i_exc in range(Nexcitons):
+
+               for iq in range(self.nqpoints):
+
+                   AbsMod= 0.0
+
+                   for t,kvc in enumerate(self.table):
+
+                      k,v,c = kvc[0:3]-1   
+
+                      kpoint_on_path = np.round( np.sqrt( abs2(lat.car_kpoints[k][0]) + abs2(lat.car_kpoints[k][1]) + abs2(lat.car_kpoints[k][2]) ),6)
+
+                      if any(np.array_equal(kpoint_on_path, matrix) for matrix in SelectedPath):
+                  
+                         print('True', kpoint_on_path)
+ 
+                         if v == self.unique_vbands[-Vband]:
+                   
+                            AbsMod += abs2(eigenvec_q[t,i_exc,iq])
+
+                      else:
+
+                         print('False', kpoint_on_path)
+                   
+                   AbsModArray[iq] = AbsMod
+                
+                   ExcitonQnumber[iq] = iq
+                   ExcitonIndex[iq] = eigenval_q.real[i_exc,iq]
+
+               f1 = pchip(ExcitonQnumber, ExcitonIndex)
+               f2 = pchip(ExcitonQnumber, AbsModArray)
+
+               x_interp = np.linspace(0, self.nqpoints-1, 1000)
+
+               y1_interp = f1(x_interp)
+               y2_interp = f2(x_interp)
+
+               ax.plot(x_interp,y1_interp, color = 'black', zorder = 1)
+            
+               #ax.plot(ExcitonQnumber,ExcitonIndex,color = 'black')
+               ax.scatter(ExcitonQnumber,ExcitonIndex, s = 300*AbsModArray, c = 300*AbsModArray, cmap = 'viridis', vmin = 0.0, vmax = 300.0, zorder = 2, edgecolor = 'black')
+
+        ax.set_ylabel('Exciton energies')
+        ax.set_xlabel('$|Q|^2$')
+
+        ax.set_xlim(0 - 0.05,(np.round( np.sqrt( abs2(lat.ibz_kpoints[-1][0]) + abs2(lat.ibz_kpoints[-1][1]) + abs2(lat.ibz_kpoints[-1][2]) )  ,6)) + 0.05)
 
 
+        return
+
+    ##########################################
+    #          Exciton Dispersion            #
+    ##########################################
 
 
+    def ExcitonDispersion(self,ax,lat,path,eigenval_q,eigenvec_q,Nexcitons):
 
+        from abipy.core.skw import SkwInterpolator
+        # Lattice and Symmetry Variables
+        lattice = self.lattice
+        cell = (lattice.lat, lattice.red_atomic_positions, lattice.atomic_numbers)
+        symrel = [sym for sym,trev in zip(lattice.sym_rec_red,lattice.time_rev_list) if trev==False ]
+        time_rev = True
+        nelect = 0  
+        lpratio=10
+        verbose=True
+        fermie = 0
+
+        kpoints_path = path.get_klist()[:,:3]
+        distances = calculate_distances(kpoints_path)
+        nkpoints_path = kpoints_path.shape[0]
+
+        na = np.newaxis
+
+        for i_exc in range(Nexcitons):
+
+            for iq in range(self.nqpoints):
+
+                # interpolate rho along the k-path
+                skw_ExcitonDispersion   = SkwInterpolator(lpratio,lat.ibz_kpoints,eigenval_q[na,:,:].real,fermie,nelect,cell,symrel,time_rev,verbose=verbose)
+                ExcitonDispersion = skw_ExcitonDispersion.interp_kpts(kpoints_path).eigens
+
+
+        for i_exc in range(Nexcitons):
+            ax.plot(distances,ExcitonDispersion[0,:,i_exc], color = 'black', lw = 1.5)
+
+        ax.set_xlim((distances[0],distances[-1]))
+       
+        for kpoint, klabel, distance in path:
+            ax.axvline(distance,c='black', alpha = 0.3, linestyle = 'dashed')
+   
+        ax.set_xticks(path.distances)
+        ax.set_xticklabels(path.klabels)
+
+        return
+
+    def tr_ExcitonDispersion(self, ax, save, path, omega_1, omega_2, omega_step, sigma, eigenval_q, eigenvec_q, Time, Pump_energy, iq_fixed, Nexcitons, size):
+
+        from abipy.core.skw import SkwInterpolator
+        # Lattice and Symmetry Variables
+        lattice = self.lattice
+        cell = (lattice.lat, lattice.red_atomic_positions, lattice.atomic_numbers)
+        symrel = [sym for sym,trev in zip(lattice.sym_rec_red,lattice.time_rev_list) if trev==False ]
+        time_rev = True
+        nelect = 0  
+        lpratio=10
+        verbose=True
+        fermie = 0
+
+        ibz_kpoints = save.red_kpoints
+
+        sigma_omega = Time/300
+        sigma_momentum = Time/30
+
+        kpoints_path = path.get_klist()[:,:3]
+        distances = calculate_distances(kpoints_path)
+        nkpoints_path = kpoints_path.shape[0]
+
+        na = np.newaxis
+
+        Gaussian = self.Gauss_dist(save, sigma_omega, sigma_momentum, eigenval_q, iq_fixed, Time, Pump_energy, Nexcitons)
+        Boltz = self.Boltz_dist(Time, eigenvec_q, eigenval_q, Nexcitons)
+        GBdistribution = self.GBdist(Time, Gaussian, Boltz, Nexcitons)
+
+
+        for i_exc in range(Nexcitons):
+
+            for iq in range(self.nqpoints):
+
+                # interpolate rho along the k-path
+                skw_ExcitonDispersion   = SkwInterpolator(lpratio,ibz_kpoints,eigenval_q[na,:,:].real,fermie,nelect,cell,symrel,time_rev,verbose=verbose)
+                ExcitonDispersion = skw_ExcitonDispersion.interp_kpts(kpoints_path).eigens
+
+                skw_Exciton_tr_weights = SkwInterpolator(lpratio,ibz_kpoints,GBdistribution[na,:,:].real,fermie,nelect,cell,symrel,time_rev,verbose=verbose)
+                Exciton_tr_weights = skw_Exciton_tr_weights.interp_kpts(kpoints_path).eigens
+
+
+        for i_exc in range(Nexcitons):
+            ax.plot(distances,ExcitonDispersion[0,:,i_exc], color = 'black', lw = 1.5)
+            dy = Exciton_tr_weights[0,:,i_exc]*size
+            ax.fill_between(distances,ExcitonDispersion[0,:,i_exc]+dy,ExcitonDispersion[0,:,i_exc]-dy,alpha=0.75,color='red',linewidth=0)
+
+        ax.set_xlim((distances[0],distances[-1]))
+       
+        for kpoint, klabel, distance in path:
+            ax.axvline(distance,c='black', alpha = 0.3, linestyle = 'dashed')
+   
+        ax.set_xticks(path.distances)
+        ax.set_xticklabels(path.klabels)
+
+        return
+
+
+    ##########################################
+    #          Exciton Dispersion            #
+    ##########################################
 
     ##########################################
     #  SPIN DEPENDENT PART UNDER DEVELOPMENT #
@@ -2413,6 +2622,24 @@ class YamboExcitonFiniteQ(YamboSaveDB):
     ##############################################
     #  END SPIN DEPENDENT PART UNDER DEVELOPMENT #
     ##############################################
+
+
+
+    def seconds_to_hms(self,seconds):
+        hours, remainder = divmod(seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return int(hours), int(minutes), int(seconds)
+
+
+
+
+
+
+
+
+
+
+
 
     def get_string(self,mark="="):
         lines = []; app = lines.append

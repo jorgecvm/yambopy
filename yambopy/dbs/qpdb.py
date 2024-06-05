@@ -300,6 +300,9 @@ class YamboQPDB():
         
         kpoints_path = path.get_klist()[:,:3]
 
+        print(kpoints)
+        exit()
+
         #interpolate KS
         ks_ebands, qp_ebands = None, None
         if 'KS' in what:
@@ -363,7 +366,7 @@ class YamboQPDB():
                print(kpoints_path)
                if valence: kwargs['fermie'] = np.max(qp_eigens_kpath[:,:valence])
 
-               qp_ebands = YambopyBandStructure(qp_eigens_kpath + 1.13 + 0.205,kpoints_path,kpath=path,**kwargs)
+               qp_ebands = YambopyBandStructure(qp_eigens_kpath+0.2921,kpoints_path,kpath=path,**kwargs)
                #qp_ebands = YambopyBandStructure(qp_eigens_kpath,kpoints_path,kpath=path,weights=qp_z_kpath,size=0.1,**kwargs)
 
             qp_z_kpath = None
