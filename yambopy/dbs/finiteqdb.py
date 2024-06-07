@@ -1666,20 +1666,62 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         return GBdist
 
-    def eigenvec_val_q(self,Nexcitons):
+    def eigenvec_val_q(self,Nexcitons,Restart = False):
 
-        eigenval_q = np.zeros([self.nqpoints, Nexcitons], dtype = complex) 
-        eigenvec_q = np.zeros([len(self.eigenvectors[0]), self.nqpoints, Nexcitons], dtype = complex) 
+        if Restart == False:
 
-        for iq in range(self.nqpoints):
+           step_eigenvalues = Nexcitons // 20  # 5% of total_loops
 
-            yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]     
+           start_time = time.time()
 
-            for ik in range(Nexcitons):
-                eigenval_q[iq,ik] = yexc_list.eigenvalues[ik]
+           print("")
+           print("")
+           print("Reading Q-excitons")
+           print("")
+           print("Progress: 0%, Estimated time remaining: Reading...")
 
-                for t in range(len(self.eigenvectors[0])):
-                    eigenvec_q[t,iq,ik] = yexc_list.eigenvectors[ik,t]
+           eigenval_q = np.zeros([self.nqpoints, Nexcitons], dtype = complex) 
+           eigenvec_q = np.zeros([len(self.eigenvectors[0]), self.nqpoints, Nexcitons], dtype = complex) 
+
+           for iq in range(self.nqpoints):
+
+               yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]     
+
+               for ik in range(Nexcitons):
+                   eigenval_q[iq,ik] = yexc_list.eigenvalues[ik]
+  
+                   for t in range(len(self.eigenvectors[0])):
+                       eigenvec_q[t,iq,ik] = yexc_list.eigenvectors[ik,t]
+
+
+           if (iq + 1) % step_eigenvalues == 0 or iq == self.nqpoints - 1:
+              elapsed_time = time.time() - start_time
+              progress = ((iq + 1) / self.nqpoints ) * 100
+              estimated_total_time = (elapsed_time / (iq + 1)) * self.nqpoints 
+              estimated_time_remaining = estimated_total_time - elapsed_time
+
+              # Convert times to hours, minutes, and seconds
+              elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
+              remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
+
+              print(f"Progress: {progress:.1f}%, Estimated time remaining: {remaining_hours}h {remaining_minutes}m {remaining_seconds}s\n")
+
+           np.save('eigenval_q.npy', eigenval_q)
+           np.save('eigenvec_q.npy', eigenvec_q)
+
+           # Final time
+           end_time = time.time()
+           total_time = end_time - start_time
+           total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
+
+           print(f"Total time taken: {total_hours}h {total_minutes}m {total_seconds}s\n")
+           print('')
+           print('rho_q computed')
+
+        if Restart == True:
+
+           eigenval_q = np.load('eigenval_q.npy')
+           eigenvec_q = np.load('eigenvec_q.npy')
 
         return eigenval_q, eigenvec_q
 
@@ -1862,7 +1904,9 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
            rho_q = np.load('rho_q.npy')
            omega_q = np.load('omega_vkl_q.npy')
-       
+
+        exit()
+
         ibz_nkpoints = max(lattice.kpoints_indexes)+1
 
         #map from bz -> ibz:
