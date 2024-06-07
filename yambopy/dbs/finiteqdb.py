@@ -458,9 +458,9 @@ class YamboExcitonFiniteQ(YamboSaveDB):
             limfactor -> factor of the lattice parameter to choose the limits of the plot 
             scale -> size of the markers
         """
-        if spin_pol is not None: print('Plotting exciton mad in 2D axis for spin polarization: %s' % spin_pol)
+        if spin_pol == None: print('Plotting exciton mad in 2D axis for spin polarization: %s' % spin_pol)
 
-        if spin_pol is not None:
+        if spin_pol == None:
            x,y,weights_bz_sum_up,weights_bz_sum_dw = self.get_exciton_2D_spin_pol(excitons,f=f)
         else:
            x,y,weights_bz_sum = self.get_exciton_2D(excitons,f=f)
@@ -470,7 +470,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         #filter points outside of area
         lim = np.max(self.lattice.rlat)*limfactor
         dlim = lim*1.1
-        if spin_pol is not None:
+        if spin_pol == None:
            filtered_weights_up = [[xi,yi,di] for xi,yi,di in zip(x,y,weights_bz_sum_up) if -dlim<xi and xi<dlim and -dlim<yi and yi<dlim]
            filtered_weights_dw = [[xi,yi,di] for xi,yi,di in zip(x,y,weights_bz_sum_dw) if -dlim<xi and xi<dlim and -dlim<yi and yi<dlim]
            x,y,weights_bz_sum_up = np.array(filtered_weights_up).T
@@ -484,9 +484,9 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         #plotting
         if mode == 'hexagon': 
             scale = kwargs.pop('scale',1)
-            if spin_pol is 'up':
+            if spin_pol == 'up':
                s=ax.scatter(x,y,s=scale,marker='H',c=weights_bz_sum_up,rasterized=True,**kwargs)
-            elif spin_pol is 'dw':
+            elif spin_pol == 'dw':
                s=ax.scatter(x,y,s=scale,marker='H',c=weights_bz_sum_dw,rasterized=True,**kwargs)
             else:
                s=ax.scatter(x,y,s=scale,marker='H',c=weights_bz_sum,rasterized=True,**kwargs)
@@ -494,9 +494,9 @@ class YamboExcitonFiniteQ(YamboSaveDB):
             ax.set_ylim(-lim,lim)
         elif mode == 'square': 
             scale = kwargs.pop('scale',1)
-            if spin_pol is 'up':
+            if spin_pol == 'up':
                s=ax.scatter(x,y,s=scale,marker='s',c=weights_bz_sum_up,rasterized=True,**kwargs)
-            elif spin_pol is 'dw':
+            elif spin_pol == 'dw':
                s=ax.scatter(x,y,s=scale,marker='s',c=weights_bz_sum_dw,rasterized=True,**kwargs)
             else:
                s=ax.scatter(x,y,s=scale,marker='s',c=weights_bz_sum,rasterized=True,**kwargs)
@@ -506,11 +506,11 @@ class YamboExcitonFiniteQ(YamboSaveDB):
             from scipy.interpolate import Rbf
             npts = kwargs.pop('npts',100)
             interp_method = kwargs.pop('interp_method','bicubic')
-            if spin_pol is 'up':
+            if spin_pol == 'up':
                rbfi = Rbf(x,y,weights_bz_sum_up,function='linear')
                x = y = np.linspace(-lim,lim,npts)
                weights_bz_sum_up = np.zeros([npts,npts])
-            elif spin_pol is 'dw':
+            elif spin_pol == 'dw':
                rbfi = Rbf(x,y,weights_bz_sum_dw,function='linear')
                x = y = np.linspace(-lim,lim,npts)
                weights_bz_sum_dw = np.zeros([npts,npts])
@@ -520,16 +520,16 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                weights_bz_sum = np.zeros([npts,npts])
 
             for col in range(npts):
-                if spin_pol is 'up':
+                if spin_pol == 'up':
                    weights_bz_sum_up[:,col] = rbfi(x,np.ones_like(x)*y[col])
-                elif spin_pol is 'dw':
+                elif spin_pol == 'dw':
                    weights_bz_sum_dw[:,col] = rbfi(x,np.ones_like(x)*y[col])
                 else:
                    weights_bz_sum[:,col] = rbfi(x,np.ones_like(x)*y[col])
             # NB we have to take the transpose of the imshow data to get the correct plot
-            if spin_pol is 'up':
+            if spin_pol == 'up':
                s=ax.imshow(weights_bz_sum_up.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim])
-            elif spin_pol is 'dw':
+            elif spin_pol == 'dw':
                s=ax.imshow(weights_bz_sum_dw.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim])
             else:
                s=ax.imshow(weights_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim])
@@ -601,9 +601,9 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         elif mode == 'square': 
             scale = kwargs.pop('scale',1)
-            if spin_pol is 'up':
+            if spin_pol == 'up':
                s=ax.scatter(x,y,s=scale,marker='s',c=weights_bz_sum_up,rasterized=True,**kwargs)
-            elif spin_pol is 'dw':
+            elif spin_pol == 'dw':
                s=ax.scatter(x,y,s=scale,marker='s',c=weights_bz_sum_dw,rasterized=True,**kwargs)
             else:
                s=ax.scatter(x,y,s=scale,marker='s',c=weights_bz_sum,rasterized=True,**kwargs)
@@ -1415,6 +1415,17 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         omega_vkl_q = np.zeros([self.nkpoints, self.nvbands, Nexcitons, self.nqpoints])
 
+        step_omega_time = Nexcitons // 20  # 5% of total_loops
+
+        start_time = time.time()
+
+        print("")
+        print("")
+        print("omega_q calculation")
+        print("")
+        print("Progress: 0%, Estimated time remaining: Calculating...")
+
+
         if isinstance(energies_db,(YamboSaveDB,YamboElectronsDB)):
 
            for i_exc in range(Nexcitons):
@@ -1428,9 +1439,18 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                            i_v2 = self.unique_vbands[i_v]
                            k_c = kindx.qindx_X[iq,i_k,0] - 1
                            omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v2] + eigenval_q.real[iq,i_exc]
-                    
-                           if omega_vkl_q[i_k,i_v,i_exc,iq] < 0:
-                              print(omega_vkl_q[i_k,i_v,i_exc,iq])
+
+           if (i_exc + 1) % step_omega_time == 0 or i_exc == Nexcitons - 1:
+              elapsed_time = time.time() - start_time
+              progress = ((i_exc + 1) / Nexcitons) * 100
+              estimated_total_time = (elapsed_time / (i_exc + 1)) * Nexcitons
+              estimated_time_remaining = estimated_total_time - elapsed_time
+
+              # Convert times to hours, minutes, and seconds
+              elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
+              remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
+
+              print(f"Progress: {progress:.1f}%, Estimated time remaining: {remaining_hours}h {remaining_minutes}m {remaining_seconds}s\n")
 
         elif isinstance(energies_db,YamboQPDB):   # To work correctly, the number of valence bands in BSEBands and the number of valence bands in the GW calculation must be the same.
 
@@ -1445,10 +1465,32 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                              k_c = kindx.qindx_X[iq,i_k,0] - 1
                              omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v] + eigenval_q.real[iq,i_exc]
 
+             if (i_exc + 1) % step_omega_time == 0 or i_exc == Nexcitons - 1:
+                elapsed_time = time.time() - start_time
+                progress = ((i_exc + 1) / Nexcitons) * 100
+                estimated_total_time = (elapsed_time / (i_exc + 1)) * Nexcitons
+                estimated_time_remaining = estimated_total_time - elapsed_time
+
+                # Convert times to hours, minutes, and seconds
+                elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
+                remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
+
+                print(f"Progress: {progress:.1f}%, Estimated time remaining: {remaining_hours}h {remaining_minutes}m {remaining_seconds}s\n")
+
         else:
             raise ValueError("Energies argument must be an instance of YamboSaveDB,"
                              "YamboElectronsDB or YamboQPDB. Got %s"%(type(energies)))
 
+        # Final time
+        end_time = time.time()
+        total_time = end_time - start_time
+        total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
+
+        np.save('omega_vkl_q.npy',omega_vkl_q)
+
+        print(f"Total time taken: {total_hours}h {total_minutes}m {total_seconds}s\n")
+        print('')
+        print('omega_q computed')
 
         return omega_vkl_q
 
@@ -1460,6 +1502,16 @@ class YamboExcitonFiniteQ(YamboSaveDB):
          
         rho_q = np.zeros([self.nkpoints, self.nvbands, Nexcitons, self.nqpoints])
 
+        step_rho_time = Nexcitons // 20  # 5% of total_loops
+
+        start_time = time.time()
+
+        print("")
+        print("")
+        print("rho_q calculation")
+        print("")
+        print("Progress: 0%, Estimated time remaining: Calculating...")
+
         for i_exc in range(Nexcitons):
 
             for iq in range(self.nqpoints):
@@ -1469,8 +1521,30 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                     i_v = v - self.unique_vbands[0] 
                     rho_q[k,i_v,i_exc,iq] += abs2(eigenvec_q[t,iq,i_exc])
 
-        return rho_q
+            if (i_exc + 1) % step_rho_time == 0 or i_exc == Nexcitons - 1:
+               elapsed_time = time.time() - start_time
+               progress = ((i_exc + 1) / Nexcitons) * 100
+               estimated_total_time = (elapsed_time / (i_exc + 1)) * Nexcitons
+               estimated_time_remaining = estimated_total_time - elapsed_time
 
+               # Convert times to hours, minutes, and seconds
+               elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
+               remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
+
+               print(f"Progress: {progress:.1f}%, Estimated time remaining: {remaining_hours}h {remaining_minutes}m {remaining_seconds}s\n")
+
+        np.save('rho_q.npy', rho_q)
+
+        # Final time
+        end_time = time.time()
+        total_time = end_time - start_time
+        total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
+
+        print(f"Total time taken: {total_hours}h {total_minutes}m {total_seconds}s\n")
+        print('')
+        print('rho_q computed')
+
+        return rho_q
 
     def Boltz_dist(self, Time, eigenvec_q, eigenval_q, Nexcitons):
 
@@ -1642,8 +1716,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         TempInset = 10000*np.exp(-(Time_dis_T)/50)
 
-        
-
         x_values = np.linspace(-50, 50, 100)
 
         def sigmoid(x):
@@ -1740,7 +1812,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         
         return 
 
-    def Photoemission(self,energies_db,kindx,path,ax,cx,bx,Time,eigenval_q,eigenvec_q,Pump_energy,Nexcitons,iq_fixed,lpratio=5,f=None,size=1,verbose=True,**kwargs):
+    def Photoemission(self,energies_db,lat,kindx,path,ax,cx,bx,Time,eigenval_q,eigenvec_q,Pump_energy,Nexcitons,iq_fixed,lpratio=5,f=None,size=1,verbose=True,Restart=False,**kwargs):
 
         from abipy.core.skw import SkwInterpolator
         Im = 1.0j # Imaginary
@@ -1780,15 +1852,23 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         else:
             raise ValueError("Energies argument must be an instance of YamboSaveDB,"
                              "YamboElectronsDB or YamboQPDB. Got %s"%(type(energies)))
+        
+        if Restart == False:
 
-        rho_q = self.calculate_rho_finiteq(kindx, eigenvec_q, eigenval_q, Nexcitons)
-        omega_q    = self.calculate_omega_finiteq(energies,energies_db,kindx, eigenvec_q, eigenval_q, Nexcitons)
+           rho_q = self.calculate_rho_finiteq(kindx, eigenvec_q, eigenval_q, Nexcitons)
+           omega_q    = self.calculate_omega_finiteq(energies,energies_db,kindx, eigenvec_q, eigenval_q, Nexcitons)
+
+        if Restart == True:
+
+           rho_q = np.load('rho_q.npy')
+           omega_q = np.load('omega_vkl_q.npy')
+       
         ibz_nkpoints = max(lattice.kpoints_indexes)+1
 
         #map from bz -> ibz:
         ibz_rho_q     = np.zeros([ibz_nkpoints,self.nvbands,Nexcitons,self.nqpoints])
         ibz_omega_q   = np.zeros([ibz_nkpoints,self.nvbands,Nexcitons,self.nqpoints])
-        ibz_kpoints   = energies_db.red_kpoints
+        ibz_kpoints   = lat.red_kpoints
 
         rho_max = np.zeros([self.nkpoints, self.nvbands, Nexcitons, self.nqpoints])
         omega_max = np.zeros([self.nkpoints, self.nvbands, Nexcitons, self.nqpoints])
@@ -1800,7 +1880,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                 if idx_ibz == 0:
                    ibz_rho_q[idx_ibz,:,:,iq]   = rho_q[idx_bz,:,:,iq] 
                    ibz_omega_q[idx_ibz,:,:,iq] = omega_q[idx_bz,:,:,iq] 
-                   print('A',iq,idx_ibz,idx_bz)
+
 
                 if idx_ibz != 0:
 
@@ -1810,7 +1890,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                       ibz_omega_q[idx_ibz,:,:,iq] = omega_q[idx_bz,:,:,iq] 
                       rho_max[idx_ibz,:,:,iq]   = rho_q[idx_bz,:,:,iq] 
                       omega_max[idx_ibz,:,:,iq] = omega_q[idx_bz,:,:,iq] 
-                      print('B',iq,idx_ibz,idx_bz) 
+
 
                 if idx_ibz == lattice.kpoints_indexes[idx_bz-1]:
 
@@ -1824,7 +1904,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                               omega_max[idx_bz,v,i_exc,iq] = max(omega_q[idx_bz,v,i_exc,iq],omega_max[idx_bz - 1,v,i_exc,iq])
                               ibz_omega_q[idx_ibz,v,i_exc,iq]   = omega_max[idx_bz,v,i_exc,iq] 
 
-                              print('C',iq,idx_ibz,idx_bz,i_exc)
+        print('Map from BZ to IBZ completed')
 
         #get DFT or GW eigenvalues
         if isinstance(energies_db,(YamboSaveDB,YamboElectronsDB)):
@@ -1858,7 +1938,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         
         print(f"{label_string_1} {Time} | {label_string_2} {sigma_omega} | {label_string_3} {sigma_momentum}")
        
-        Gaussian = self.Gauss_dist(energies_db, sigma_omega, sigma_momentum, eigenval_q, iq_fixed, Time, Pump_energy, Nexcitons)
+        Gaussian = self.Gauss_dist(lat, sigma_omega, sigma_momentum, eigenval_q, iq_fixed, Time, Pump_energy, Nexcitons)
         Boltz = self.Boltz_dist(Time, eigenvec_q, eigenval_q, Nexcitons)
         GBdistribution = self.GBdist(Time, Gaussian, Boltz, Nexcitons)
 
