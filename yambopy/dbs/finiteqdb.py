@@ -1446,7 +1446,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
               estimated_total_time = (elapsed_time / (i_exc + 1)) * Nexcitons
               estimated_time_remaining = estimated_total_time - elapsed_time
 
-              # Convert times to hours, minutes, and seconds
+              #Convert times to hours, minutes, and seconds
               elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
               remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
 
@@ -1481,7 +1481,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
             raise ValueError("Energies argument must be an instance of YamboSaveDB,"
                              "YamboElectronsDB or YamboQPDB. Got %s"%(type(energies)))
 
-        # Final time
+        #Final time
         end_time = time.time()
         total_time = end_time - start_time
         total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
@@ -1527,7 +1527,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                estimated_total_time = (elapsed_time / (i_exc + 1)) * Nexcitons
                estimated_time_remaining = estimated_total_time - elapsed_time
 
-               # Convert times to hours, minutes, and seconds
+               #Convert times to hours, minutes, and seconds
                elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
                remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
 
@@ -1571,7 +1571,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
     def Gauss_func(self, sigma_omega, sigma_momentum, omega_in, qmod_in, w_0, qmod_0):
 
-        Gaussian = ( (1.0) / (sigma_omega  * np.sqrt(2.0 * np.pi) ) )*( np.exp( (-0.5)*( ( (omega_in - w_0)/(sigma_omega) )**2 ) ) )
+        Gaussian = ( (1.0) / (sigma_omega  * np.sqrt(2.0 * np.pi) ) )*( np.exp( (-0.5)*( ( (omega_in - w_0)/(sigma_omega) )**2 ) ) )*( np.exp( (-0.5)*( ( (qmod_in - qmod_0)/(sigma_momentum) )**2 ) ) )
 
         return Gaussian
 
@@ -1615,15 +1615,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
                    Gauss_dis[iq,i_exc] = self.Gauss_func(sigma_omega,sigma_momentum,eigenval_q.real[iq,i_exc],qmod_in,w_0,qmod_0)
 
-
-        Gauss_renorm = 0.0
-
-        for i_exc in range(Nexcitons):
-            for iq in range(self.nqpoints):
-              Gauss_renorm += Gauss_dis[iq,i_exc]
-
-        Gauss_dis = Gauss_dis/Gauss_renorm
-
         return Gauss_dis
 
     def GBdist(self, Time, Gauss_dis, Btz_d, Nexcitons):
@@ -1653,7 +1644,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                       GBdist[iq,i_exc] = 0.0
 
                    else:
-
+   
                       GBdist[iq,i_exc] = ((1.0 - Alpha[Time])*Gauss_dis[iq,i_exc] + Alpha[Time]*Btz_d[iq,i_exc])*Signal_construction[Time]
 
         if Time >= 100:
@@ -1663,6 +1654,8 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                for iq in range(self.nqpoints):
 
                    GBdist[iq,i_exc] = Btz_d[iq,i_exc]
+
+        print(GBdist)
 
         return GBdist
 
@@ -1694,29 +1687,29 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                        eigenvec_q[t,iq,ik] = yexc_list.eigenvectors[ik,t]
 
 
-           if (iq + 1) % step_eigenvalues == 0 or iq == self.nqpoints - 1:
-              elapsed_time = time.time() - start_time
-              progress = ((iq + 1) / self.nqpoints ) * 100
-              estimated_total_time = (elapsed_time / (iq + 1)) * self.nqpoints 
-              estimated_time_remaining = estimated_total_time - elapsed_time
+           #if (iq + 1) % step_eigenvalues == 0 or iq == self.nqpoints - 1:
+              #elapsed_time = time.time() - start_time
+              #progress = ((iq + 1) / self.nqpoints ) * 100
+              #estimated_total_time = (elapsed_time / (iq + 1)) * self.nqpoints 
+              #estimated_time_remaining = estimated_total_time - elapsed_time
 
               # Convert times to hours, minutes, and seconds
-              elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
-              remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
+              #elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
+              #remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
 
-              print(f"Progress: {progress:.1f}%, Estimated time remaining: {remaining_hours}h {remaining_minutes}m {remaining_seconds}s\n")
+              #print(f"Progress: {progress:.1f}%, Estimated time remaining: {remaining_hours}h {remaining_minutes}m {remaining_seconds}s\n")
 
            np.save('eigenval_q.npy', eigenval_q)
            np.save('eigenvec_q.npy', eigenvec_q)
 
            # Final time
-           end_time = time.time()
-           total_time = end_time - start_time
-           total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
+           #end_time = time.time()
+           #total_time = end_time - start_time
+           #total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
 
-           print(f"Total time taken: {total_hours}h {total_minutes}m {total_seconds}s\n")
-           print('')
-           print('rho_q computed')
+           #print(f"Total time taken: {total_hours}h {total_minutes}m {total_seconds}s\n")
+           #print('')
+           #print('rho_q computed')
 
         if Restart == True:
 
@@ -1854,7 +1847,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         
         return 
 
-    def Photoemission(self,energies_db,lat,kindx,path,ax,cx,bx,Time,eigenval_q,eigenvec_q,Pump_energy,Nexcitons,iq_fixed,lpratio=5,f=None,size=1,verbose=True,Restart=False,**kwargs):
+    def Photoemission(self,energies_db,lat,kindx,path,ax,cx,bx,Time,eigenval_q,eigenvec_q,Pump_energy,Nexcitons,iq_fixed,lpratio=5,f=None,size=1,verbose=True,Restart=False,Restart_skw=False,**kwargs):
 
         from abipy.core.skw import SkwInterpolator
         Im = 1.0j # Imaginary
@@ -1904,8 +1897,6 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
            rho_q = np.load('rho_q.npy')
            omega_q = np.load('omega_vkl_q.npy')
-
-        exit()
 
         ibz_nkpoints = max(lattice.kpoints_indexes)+1
 
@@ -1986,20 +1977,31 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         Boltz = self.Boltz_dist(Time, eigenvec_q, eigenval_q, Nexcitons)
         GBdistribution = self.GBdist(Time, Gaussian, Boltz, Nexcitons)
 
-        for i_exc in range(Nexcitons):
 
-            for iq in range(self.nqpoints):
+        if Restart_skw == False:
 
-                # interpolate rho along the k-path
-                skw_rho_q   = SkwInterpolator(lpratio,ibz_kpoints,ibz_rho_q[na,:,:,i_exc,iq],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
-                rho_q_path[0,:,:,i_exc,iq] = skw_rho_q.interp_kpts(kpoints_path).eigens
+           for i_exc in range(Nexcitons):
 
-                # interpolate omega along the k-path
-                skw_omega_q = SkwInterpolator(lpratio,ibz_kpoints,ibz_omega_q[na,:,:,i_exc,iq],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
-                omega_q_path[0,:,:,i_exc,iq] = skw_omega_q.interp_kpts(kpoints_path).eigens
+               for iq in range(self.nqpoints):
+
+                   # interpolate rho along the k-path
+                   skw_rho_q   = SkwInterpolator(lpratio,ibz_kpoints,ibz_rho_q[na,:,:,i_exc,iq],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
+                   rho_q_path[0,:,:,i_exc,iq] = skw_rho_q.interp_kpts(kpoints_path).eigens
+
+                   # interpolate omega along the k-path
+                   skw_omega_q = SkwInterpolator(lpratio,ibz_kpoints,ibz_omega_q[na,:,:,i_exc,iq],fermie,nelect,cell,symrel,time_rev,verbose=verbose)
+                   omega_q_path[0,:,:,i_exc,iq] = skw_omega_q.interp_kpts(kpoints_path).eigens
 
       
-        rho_q_path[rho_q_path < 0] = 0
+           rho_q_path[rho_q_path < 0] = 0
+
+           np.save('rho_q_path.npy', rho_q_path)
+           np.save('omega_q_path.npy', omega_q_path)
+
+        if Restart_skw == True:
+
+           rho_q_path = np.load('rho_q_path.npy')
+           omega_q_path = np.load('omega_q_path.npy')
 
         # interpolate energies
 
@@ -2030,15 +2032,16 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         print("")
         print("Progress: 0%, Estimated time remaining: Calculating...")
 
+        '''
         for i_o in range(n_omegas):
 
-            for i_exc in range(Nexcitons):
+            for i_k in range(nkpoints_path):
 
-                for iq in range(self.nqpoints):
+                for i_exc in range(Nexcitons):
 
-                    for i_k in range(nkpoints_path):
+                      for iq in range(self.nqpoints):
 
-                        for i_v in range(self.nvbands): 
+                         for i_v in range(self.nvbands): 
 
                             delta_q = 1.0/( omega_band[i_o] - omega_q_path[0, i_k, i_v, i_exc, iq] + Im*omega_width )
 
@@ -2050,6 +2053,43 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                estimated_total_time = (elapsed_time / (i_o + 1)) * n_omegas
                estimated_time_remaining = estimated_total_time - elapsed_time
 
+
+               # Convert times to hours, minutes, and seconds
+               elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
+               remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
+
+
+               print(f"Progress: {progress:.1f}%, Estimated time remaining: {remaining_hours}h {remaining_minutes}m {remaining_seconds}s\n")
+
+        # Final time
+        end_time = time.time()
+        total_time = end_time - start_time
+        total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
+        
+        print(f"Total time taken: {total_hours}h {total_minutes}m {total_seconds}s\n")
+        '''
+
+        GBdistribution = GBdistribution.transpose()
+        GBdistribution = GBdistribution.reshape(1,Nexcitons,self.nqpoints)
+        GBdistribution = np.repeat(GBdistribution, self.nvbands, axis=0)
+
+        start_time = time.time()
+
+        for i_o in range(n_omegas):
+
+            for i_k in range(nkpoints_path):
+
+                Intensity_q_path = 2.0*np.pi*GBdistribution[:,:,:]*rho_q_path[0, i_k, :, :, :]*(- (1.0/( omega_band[i_o] - omega_q_path[0, i_k, :, :, :] + Im*omega_width )).imag)
+
+                Intensity_q[i_o,i_k] = np.sum(Intensity_q_path)
+
+            if (i_o + 1) % step_tr_arpes_along_path == 0 or i_o == n_omegas - 1:
+               elapsed_time = time.time() - start_time
+               progress = ((i_o + 1) / n_omegas) * 100
+               estimated_total_time = (elapsed_time / (i_o + 1)) * n_omegas
+               estimated_time_remaining = estimated_total_time - elapsed_time
+
+
                # Convert times to hours, minutes, and seconds
                elapsed_hours, elapsed_minutes, elapsed_seconds = self.seconds_to_hms(elapsed_time)
                remaining_hours, remaining_minutes, remaining_seconds = self.seconds_to_hms(estimated_time_remaining)
@@ -2060,13 +2100,13 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         end_time = time.time()
         total_time = end_time - start_time
         total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
-
+        
         print(f"Total time taken: {total_hours}h {total_minutes}m {total_seconds}s\n")
 
         ############################################
         ##### tr-ARPES interpolated along path #####
         ############################################
-
+        
         ###############################################
         ##### tr-ARPES interpolated along full BZ #####
         ###############################################
@@ -2083,20 +2123,14 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         for i_o in range(n_omegas):
 
-            for i_exc in range(Nexcitons):
+             for i_k in range(fullbz_nkpoints):
 
-                for iq in range(self.nqpoints):
-
-                    for i_k in range(fullbz_nkpoints):
-
-                        for i_v in range(self.nvbands): 
-
-                            delta_q = 1.0/( omega_band[i_o] - omega_q[i_k, i_v, i_exc, iq] + Im*omega_width )
-
-                            Intensity_full_BZ[i_o,i_k] += 2*np.pi*GBdistribution[iq,i_exc]*rho_q[i_k, i_v, i_exc, iq]*(-delta_q.imag)
+                Intensity_q_BZ = 2.0*np.pi*GBdistribution[:,:,:]*rho_q[i_k, :, :, :]*(- (1.0/( omega_band[i_o] - omega_q[i_k, :, :, :] + Im*omega_width )).imag)
 
 
-            if (i_o + 1) % step_tr_arpes_full_bz == 0 or i_o == n_omegas - 1:
+                Intensity_full_BZ[i_o,i_k] = np.sum(Intensity_q_BZ)
+
+             if (i_o + 1) % step_tr_arpes_full_bz == 0 or i_o == n_omegas - 1:
                elapsed_time = time.time() - start_time
                progress = ((i_o + 1) / n_omegas) * 100
                estimated_total_time = (elapsed_time / (i_o + 1)) * n_omegas
@@ -2118,7 +2152,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         ###############################################
         ##### tr-ARPES interpolated along full BZ #####
         ###############################################
-
+        
         X, Y = np.meshgrid(distances, omega_band)
         import matplotlib.pyplot as plt
 
@@ -2127,7 +2161,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
            ax.pcolor(X, Y, Intensity_q, vmin = 0.0, vmax = 1.0, cmap='magma', shading='auto')
 
         else:
-           ax.pcolor(X, Y, Intensity_q, vmin = np.amin(Intensity_q), vmax = np.amax(Intensity_q), cmap=cmap_name, shading = 'auto')
+           ax.pcolor(X, Y, Intensity_q, vmin = np.amin(Intensity_q), vmax = 175, cmap=cmap_name, shading = 'auto')
 
         print(np.amax(Intensity_q))
 
@@ -2159,46 +2193,45 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         ax.set_title(f"Time = {Time}")
 
-
         PE_path = np.zeros(n_omegas)
         PE_full_BZ = np.zeros(n_omegas)
 
         for i_w in range(n_omegas):
             for i_k in range(nkpoints_path):
                 PE_path[i_w] += Intensity_q[i_w,i_k]
-
+        
         for i_w in range(n_omegas):
             for i_k in range(fullbz_nkpoints):
                 PE_full_BZ[i_w] += Intensity_full_BZ[i_w,i_k]
-
+        '''
         PE_path = PE_path/np.amax(PE_path)
         PE_full_BZ = PE_full_BZ/np.amax(PE_full_BZ)
-
+        '''
         bx.plot(PE_path,omega_band, color = 'darkblue', lw = 1.5, label = "PE - Along path")
         bx.legend(loc = 'lower right', frameon = False)
         bx.set_ylim((omega_1,omega_2))
-        bx.set_xlim((0.0,max(PE_path)))
+        bx.set_xlim((0.0,1600))
 
         bx.yaxis.set_ticklabels([]) 
         bx.yaxis.set_ticks([]) 
 
-        ind = (0.0, 0.5, 1.0)
+        ind = (0.0, 1600)
         bx.xaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
-        bx.set_xticklabels(['0.0', '0.5', '1.0'])
+        bx.set_xticklabels(['0.0', '1.0'])
 
         bx.tick_params(top=True, labeltop=True, labelbottom=False)
 
         cx.plot(PE_full_BZ,omega_band, color = 'crimson', lw = 1.5, label = f"PE - Full BZ")
         cx.legend(loc = 'lower right', frameon = False)
         cx.set_ylim((omega_1,omega_2))
-        cx.set_xlim((0.0,max(PE_full_BZ)))
+        cx.set_xlim((0.0,140))
 
         cx.yaxis.set_ticklabels([]) 
         cx.yaxis.set_ticks([]) 
  
-        ind = (0.0, 0.5, 1.0)
+        ind = (0.0, 140)
         cx.xaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind))
-        cx.set_xticklabels(['0.0', '0.5', '1.0'])
+        cx.set_xticklabels(['0.0', '1.0'])
 
         cx.tick_params(bottom=True, labelbottom=True)
 
@@ -2412,18 +2445,12 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         Boltz = self.Boltz_dist(Time, eigenvec_q, eigenval_q, Nexcitons)
         GBdistribution = self.GBdist(Time, Gaussian, Boltz, Nexcitons)
 
+        # interpolate rho along the k-path
+        skw_ExcitonDispersion   = SkwInterpolator(lpratio,ibz_kpoints,eigenval_q[na,:,:].real,fermie,nelect,cell,symrel,time_rev,verbose=verbose)
+        ExcitonDispersion = skw_ExcitonDispersion.interp_kpts(kpoints_path).eigens
 
-        for i_exc in range(Nexcitons):
-
-            for iq in range(self.nqpoints):
-
-                # interpolate rho along the k-path
-                skw_ExcitonDispersion   = SkwInterpolator(lpratio,ibz_kpoints,eigenval_q[na,:,:].real,fermie,nelect,cell,symrel,time_rev,verbose=verbose)
-                ExcitonDispersion = skw_ExcitonDispersion.interp_kpts(kpoints_path).eigens
-
-                skw_Exciton_tr_weights = SkwInterpolator(lpratio,ibz_kpoints,GBdistribution[na,:,:].real,fermie,nelect,cell,symrel,time_rev,verbose=verbose)
-                Exciton_tr_weights = skw_Exciton_tr_weights.interp_kpts(kpoints_path).eigens
-
+        skw_Exciton_tr_weights = SkwInterpolator(lpratio,ibz_kpoints,GBdistribution[na,:,:].real,fermie,nelect,cell,symrel,time_rev,verbose=verbose)
+        Exciton_tr_weights = skw_Exciton_tr_weights.interp_kpts(kpoints_path).eigens
 
         for i_exc in range(Nexcitons):
             ax.plot(distances,ExcitonDispersion[0,:,i_exc], color = 'black', lw = 1.5)

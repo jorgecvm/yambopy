@@ -229,7 +229,6 @@ class YambopyBandStructure():
         linestyle = kwargs.pop('linestyle',None)
         dashes = kwargs.pop('dashes',None)    
     
-
         # Add option to plot lines or dots
         #linetype
         #dot symbol
@@ -241,6 +240,7 @@ class YambopyBandStructure():
             if dashes is None:
                ax.plot(x,y,c=c_bands,lw=lw_label,label=c_label, alpha = 0.6)
             if dashes is not None:
+               print(x,y)
                ax.plot(x,y,c=c_bands,lw=lw_label,label=c_label, linestyle = linestyle, dashes = dashes, alpha = 0.6)
             # fill between 
             if self.weights is not None: # and self.spin_proj is not None:
