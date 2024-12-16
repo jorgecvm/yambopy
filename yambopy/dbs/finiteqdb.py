@@ -8,6 +8,7 @@ from yambopy.dbs.latticedb import *
 from yambopy.dbs.electronsdb import *
 from yambopy.dbs.qpdb import *
 from matplotlib import cm
+from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import matplotlib
 import time
@@ -438,7 +439,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         print(weights_c_bz_sum)
 
 
-        kmesh_full, kmesh_idx = replicate_red_kmesh(self.lattice.red_kpoints,repx=range(0,1),repy=range(0,1))
+        kmesh_full, kmesh_idx = replicate_red_kmesh(self.lattice.red_kpoints,repx=range(-1,2),repy=range(-1,2))
         x,y = red_car(kmesh_full,self.lattice.rlat)[:,:2].T
         weights_v_bz_sum = weights_v_bz_sum[kmesh_idx]
         weights_c_bz_sum = weights_c_bz_sum[kmesh_idx]
@@ -544,6 +545,12 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
  
     def plot_exciton_2D_ax_finiteq(self,ax,bx,cx,iq,kindx,excitons,f=None,mode='hexagon',limfactor=0.8,spin_pol=None,**kwargs):
+
+        from matplotlib.colors import ListedColormap
+
+
+        import matplotlib.colors as mcolors
+
         """
         Plot the exciton weights in a 2D Brillouin zone for finite-q where the plots in valence and conduction are different
        
@@ -558,6 +565,31 @@ class YamboExcitonFiniteQ(YamboSaveDB):
             limfactor -> factor of the lattice parameter to choose the limits of the plot 
             scale -> size of the markers
         """
+
+        def create_custom_reds_cmap(transparent_fraction,color):
+            n = 256  # Number of colors in the colormap
+    
+            # Create the base colormap (Reds) without alpha
+            reds = plt.cm.get_cmap(color, n)
+    
+            # Define colors: first part white and transparent, remaining part gradient from white to red
+            colors = reds(np.linspace(0, 1, n))
+    
+            # Set the first part to white and transparent
+            colors[:int(n * transparent_fraction), :3] = 1  # Set RGB to white
+            colors[:int(n * transparent_fraction), -1] = 0  # Set alpha to 0 (transparent)
+    
+            # Create the new colormap
+            custom_cmap = LinearSegmentedColormap.from_list("custom_reds", colors)
+    
+            return custom_cmap
+
+        # Usage example
+        transparent_fraction = 0.1  # 20% transparent and white
+        custom_cmap_v = create_custom_reds_cmap(transparent_fraction,'Purples')
+        custom_cmap_c = create_custom_reds_cmap(transparent_fraction,'Greens')
+
+        # Plot an example to show the new colormap
         
         x,y,weights_v_bz_sum,weights_c_bz_sum = self.get_exciton_2D_finite_q(excitons,self.Qpt,kindx,f=f)
 
@@ -637,8 +669,8 @@ class YamboExcitonFiniteQ(YamboSaveDB):
                 cmap_total = plt.cm.viridis
                 s_v=ax.imshow(weights_v_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = cmap_v, alpha = 1.0)
                 s_c=bx.imshow(weights_c_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = cmap_c, alpha = 1.0)
-                s_total_1=cx.imshow(weights_v_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = cmap_v, alpha = 1.0)
-                s_total_2=cx.imshow(weights_c_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = cmap_c, alpha = 0.5)
+                s_total_1=cx.imshow(weights_v_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = custom_cmap_v, alpha = 1.0, vmin = 0.1, vmax = 1.0)
+                s_total_2=cx.imshow(weights_c_bz_sum.T,interpolation=interp_method,extent=[-lim,lim,-lim,lim], cmap = custom_cmap_c, alpha = 1.0, vmin = 0.1, vmax = 1.0)
 
 
         ax.set_title('Valence contribution')
@@ -1425,20 +1457,23 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         print("")
         print("Progress: 0%, Estimated time remaining: Calculating...")
 
+        k_c_matrix = kindx.qindx_X[:, :, 0] - 1
+
+        unique_vbands_indices = np.array([self.unique_vbands[i_v] for i_v in range(self.nvbands)])
 
         if isinstance(energies_db,(YamboSaveDB,YamboElectronsDB)):
 
            for i_exc in range(Nexcitons):
 
+               eigenval_real_q_exc = eigenval_q.real[:, i_exc]
+
                for iq in range(self.nqpoints):
 
                    for i_k in range(self.nkpoints):
 
-                       for i_v in range(self.nvbands):
-
-                           i_v2 = self.unique_vbands[i_v]
-                           k_c = kindx.qindx_X[iq,i_k,0] - 1
-                           omega_vkl_q[i_k,i_v,i_exc,iq] = energies[k_c,i_v2] + eigenval_q.real[iq,i_exc]
+                       k_c = k_c_matrix[iq, i_k]
+                       energies_k_c = energies[k_c, unique_vbands_indices]
+                       omega_vkl_q[i_k, :, i_exc, iq] = energies_k_c + eigenval_real_q_exc[iq]
 
            if (i_exc + 1) % step_omega_time == 0 or i_exc == Nexcitons - 1:
               elapsed_time = time.time() - start_time
@@ -1486,12 +1521,12 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         total_time = end_time - start_time
         total_hours, total_minutes, total_seconds = self.seconds_to_hms(total_time)
 
-        np.save('omega_vkl_q.npy',omega_vkl_q)
-
+        np.save('omega_vkl_q_prueba_optimized.npy',omega_vkl_q)
+   
         print(f"Total time taken: {total_hours}h {total_minutes}m {total_seconds}s\n")
         print('')
         print('omega_q computed')
-
+        exit()
         return omega_vkl_q
 
 
@@ -1797,15 +1832,13 @@ class YamboExcitonFiniteQ(YamboSaveDB):
            eigenval_q = np.zeros([self.nqpoints, Nexcitons], dtype = complex) 
            eigenvec_q = np.zeros([len(self.eigenvectors[0]), self.nqpoints, Nexcitons], dtype = complex) 
 
-           for iq in range(self.nqpoints):
+           # Pre-fetch all yexc_list to minimize function calls
+           yexc_list_all = [self.from_db_file(self.lattice, filename='ndb.BS_diago_Q1', folder='yambo')[iq] for iq in range(self.nqpoints)]
 
-               yexc_list = self.from_db_file(self.lattice,filename='ndb.BS_diago_Q1',folder='yambo')[iq]     
-
-               for ik in range(Nexcitons):
-                   eigenval_q[iq,ik] = yexc_list.eigenvalues[ik]
-  
-                   for t in range(len(self.eigenvectors[0])):
-                       eigenvec_q[t,iq,ik] = yexc_list.eigenvectors[ik,t]
+           # Iterate through all q points
+           for iq, yexc_list in enumerate(yexc_list_all):
+               eigenval_q[iq, :] = yexc_list.eigenvalues[:Nexcitons]
+               eigenvec_q[:, iq, :] = yexc_list.eigenvectors[:Nexcitons, :].T
 
 
            #if (iq + 1) % step_eigenvalues == 0 or iq == self.nqpoints - 1:
@@ -1820,8 +1853,8 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
               #print(f"Progress: {progress:.1f}%, Estimated time remaining: {remaining_hours}h {remaining_minutes}m {remaining_seconds}s\n")
 
-           np.save('eigenval_q.npy', eigenval_q)
-           np.save('eigenvec_q.npy', eigenvec_q)
+           np.save('eigenval_q_prueba.npy', eigenval_q)
+           np.save('eigenvec_q_prueba.npy', eigenvec_q)
 
            # Final time
            #end_time = time.time()
@@ -1869,7 +1902,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         
         Time_dis_T = np.linspace(0, 350, 350)
 
-        TempInset = 30000*np.exp(-(Time_dis_T)/35)
+        TempInset = 30000*np.exp(-(Time_dis_T)/28)
 
         x_values = np.linspace(-50, 100, 150)
 
@@ -1885,7 +1918,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
 
         ax.plot(Time_dis_T,TempInset, color = 'darkorange', lw = 2, label = 'T(t)')
 
-        ax.legend(loc = (0.70,0.95), frameon = False)
+        ax.legend(loc = (0.70,0.75), frameon = False)
 
         ax.set_xlim(0.0,350.0)
         ax.set_ylim(0.0,30000)
@@ -1897,7 +1930,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         ax2.plot(x_values + 50,Alpha_dis, color = 'magenta', lw = 2, label = 'Alpha (t)')
 
         ax2.axvline(x = Time, linestyle = 'dashed', lw = 1, color = 'black')
-        ax2.legend(loc = (0.70,0.90), frameon = False)
+        ax2.legend(loc = (0.70,0.70), frameon = False)
         
         GaussianPerc = '% Gaussian'
         BoltzmannPerc = '% Boltzmann'
@@ -1912,7 +1945,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         w_0_Perc = Pump_energy - (Exc_dif_Perc*Time)/(135)
 
         w_0_Perc_final = Pump_energy - (Exc_dif_Perc*150)/(135)
-
+        '''
         if Time < 150:
            ax.text(248,26000,f"{((1-Alpha_dis[Time])*100):.3f} {GaussianPerc}")
            ax.text(248,24500,f"{(Alpha_dis[Time]*100):.3f} {BoltzmannPerc}")
@@ -1926,7 +1959,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
            ax.text(248,23000,f"{PumpEnergyPerc} {Pump_energy:.3f} {'eV'}")
            ax.text(248,21500,f"{PumpEnergyPerc_time} {(w_0_Perc_final):.3f} {'eV'}") 
            ax.text(248,20000,f"{Temp_perc} {TempInset[Time]:.0f}")
-
+        '''
         ax.text(248,18500,f"{Time_perc} {Time}")
         ax.set_xlabel('Time')
         ax.set_ylabel('Temperature')
@@ -1959,7 +1992,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         ind2 = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
 
         ax2.yaxis.set_major_locator(matplotlib.ticker.FixedLocator(ind2))
-        ax2.set_yticklabels(['0', '0.2', '0.4', '0.6', '0.8', '1.0'])
+        ax2.set_yticklabels(['100% Gaussian', '80% Gaussian', '60% Gaussian', '60% Boltzmann', '80% Boltzmann', '100% Boltzmann'])
         
         return 
 
@@ -2006,7 +2039,7 @@ class YamboExcitonFiniteQ(YamboSaveDB):
         
         if Restart == False:
 
-           rho_q = self.calculate_rho_finiteq(kindx, eigenvec_q, eigenval_q, Nexcitons)
+           #rho_q = self.calculate_rho_finiteq(kindx, eigenvec_q, eigenval_q, Nexcitons)
            omega_q    = self.calculate_omega_finiteq(energies,energies_db,kindx, eigenvec_q, eigenval_q, Nexcitons)
 
         if Restart == True:

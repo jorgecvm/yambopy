@@ -29,6 +29,7 @@ def calculate_distances_2D(kpoints):
     for nk in range(1,len(kpoints_2D)):
         distance_2D += np.linalg.norm(kpoints_2D[nk-1]-kpoints_2D[nk])
         distances_2D.append(distance_2D)
+
     return distances_2D
 
 class Path(object):
