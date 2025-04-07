@@ -1,7 +1,7 @@
 Tutorial
 ========
 
-How to converge the time step of a Yambo RT simulation.
+How to converge the time step of a Yambo RT simulation and plot the carriers along the BZ.
 
 - Examples are in: tutorial/real-time
 - Yambopy code is at: yambopy/rt, yambopy/io, yambopy/dbs
@@ -35,3 +35,9 @@ How to converge the time step of a Yambo RT simulation.
 
     YamboRTStep_Optimize('TD_inputs/td_ip.in','database/FixSymm/SAVE') #RT input and SAVE paths
  ..
+
+## Plot of RT carriers
+
+4. Plot of the carriers for a given time and band:
+
+   python plot-rt-carriers.py

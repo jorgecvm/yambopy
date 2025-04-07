@@ -48,12 +48,12 @@ class ConvertElectronPhononDB():
 
         # Get yambo initialization and lattice info
         self.get_yambo_header_variables(SAVE_path)
-        '''
+        
         # Get el-ph data from external code
         match code:
             case 'lelphc': self.get_elph_variables_LELPHC(OBJ)
             case _: raise NotImplementedError("Code %s not found or implemented"%code)
-        '''
+        
         if not os.path.isdir(OUT_path): os.mkdir(OUT_path)
 
         # Write ndb.elph_gkkp_expanded in OUT_path
